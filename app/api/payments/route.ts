@@ -10,39 +10,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Gecersiz odeme verisi" }, { status: 400 });
   }
 
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("total_debt")
-    .eq("id", customer_id)
-    .single();
-
-  if (!customer) {
-    return NextResponse.json({ error: "Musteri bulunamadi" }, { status: 404 });
-  }
-
-  const newDebt = Math.max(0, (customer.total_debt || 0) - amount);
-
-  await supabase
-    .from("customers")
-    .update({ total_debt: newDebt, updated_at: new Date().toISOString() })
-    .eq("id", customer_id);
-
-  const { data, error } = await supabase
-    .from("debt_transactions")
-    .insert({
-      customer_id,
-      service_record_id: service_record_id || null,
-      transaction_type: "odeme",
-      amount: -amount,
-      description: description || "Manuel odeme",
-      balance_after: newDebt,
-    })
-    .select()
-    .single();
+  // Tek RPC çağrısı: borç güncelleme + işlem kaydı — tek DB round-trip
+  const { data, error } = await supabase.rpc("record_payment", {
+    p_customer_id:       customer_id,
+    p_amount:            amount,
+    p_description:       description || "Manuel odeme",
+    p_service_record_id: service_record_id || null,
+  });
 
   if (error) {
+    // "Musteri bulunamadi" hatası için 404
+    if (error.message?.includes("bulunamadi")) {
+      return NextResponse.json({ error: "Musteri bulunamadi" }, { status: 404 });
+    }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({ data, new_debt: newDebt }, { status: 201 });
+  return NextResponse.json({ data: data.transaction, new_debt: data.new_debt }, { status: 201 });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeftIcon, PlusIcon, TrashIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
@@ -70,9 +70,33 @@ function NewServiceForm() {
   const [lineItems, setLineItems] = useState<(ServiceLineItemInput & { key: number })[]>([
     { key: Date.now(), product_id: "", name: "", quantity: 1, unit_price: 0 },
   ]);
+  const [openProductKey, setOpenProductKey] = useState<number | null>(null);
+  const customerSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    fetch("/api/products?active=true").then((r) => r.json()).then((d) => setProducts(d.data || []));
+    // Ürünleri sessionStorage'dan al — 5 dakika geçerli
+    const CACHE_KEY = "products_v1";
+    const CACHE_TS  = "products_v1_ts";
+    const TTL_MS    = 5 * 60 * 1000; // 5 dakika
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      const ts     = Number(sessionStorage.getItem(CACHE_TS) || 0);
+      if (cached && Date.now() - ts < TTL_MS) {
+        setProducts(JSON.parse(cached));
+      } else {
+        fetch("/api/products?active=true")
+          .then((r) => r.json())
+          .then((d) => {
+            const list = d.data || [];
+            setProducts(list);
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify(list));
+            sessionStorage.setItem(CACHE_TS, String(Date.now()));
+          });
+      }
+    } catch {
+      // sessionStorage yoksa (private mode vb.) doğrudan fetch
+      fetch("/api/products?active=true").then((r) => r.json()).then((d) => setProducts(d.data || []));
+    }
 
     if (preVehicleId) {
       fetch(`/api/vehicles/${preVehicleId}`)
@@ -119,6 +143,30 @@ function NewServiceForm() {
   function removeLine(key: number) {
     if (lineItems.length === 1) return;
     setLineItems((prev) => prev.filter((li) => li.key !== key));
+  }
+
+  function handleProductInput(key: number, value: string) {
+    updateLineItem(key, "name", value);
+    updateLineItem(key, "product_id", "");
+    setOpenProductKey(key);
+    const match = products.find((p) => p.name.toLowerCase() === value.toLowerCase());
+    if (match) {
+      updateLineItem(key, "unit_price", match.unit_price);
+      updateLineItem(key, "product_id", match.id);
+    }
+  }
+
+  function selectProduct(key: number, product: Product) {
+    updateLineItem(key, "name", product.name);
+    updateLineItem(key, "unit_price", product.unit_price);
+    updateLineItem(key, "product_id", product.id);
+    setOpenProductKey(null);
+  }
+
+  function getFilteredProducts(key: number) {
+    const q = lineItems.find((l) => l.key === key)?.name || "";
+    if (!q) return products.slice(0, 7);
+    return products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase())).slice(0, 8);
   }
 
   const partsTotal = lineItems.reduce((s, li) => s + li.quantity * li.unit_price, 0);
@@ -194,9 +242,11 @@ function NewServiceForm() {
                   type="text"
                   value={customerSearch}
                   onChange={(e) => {
-                    setCustomerSearch(e.target.value);
-                    if (!e.target.value) { setSelectedCustomer(null); setSelectedVehicle(null); }
-                    searchCustomers(e.target.value);
+                    const val = e.target.value;
+                    setCustomerSearch(val);
+                    if (!val) { setSelectedCustomer(null); setSelectedVehicle(null); setCustomers([]); return; }
+                    if (customerSearchRef.current) clearTimeout(customerSearchRef.current);
+                    customerSearchRef.current = setTimeout(() => searchCustomers(val), 300);
                   }}
                   placeholder="Müşteri adı ile ara..."
                   style={{ ...S.inp, paddingLeft: 32 }}
@@ -269,15 +319,25 @@ function NewServiceForm() {
               </div>
               {lineItems.map((li) => (
                 <div key={li.key} style={S.tableRow}>
-                  <div>
+                  <div style={{ position: "relative" }}>
                     <input type="text" placeholder="Ürün / hizmet adı" value={li.name}
-                      onChange={(e) => {
-                        updateLineItem(li.key, "name", e.target.value);
-                        const match = products.find((p) => p.name === e.target.value);
-                        if (match) { updateLineItem(li.key, "unit_price", match.unit_price); updateLineItem(li.key, "product_id", match.id); }
-                      }}
-                      list={`products-${li.key}`} style={S.inpSm} />
-                    <datalist id={`products-${li.key}`}>{products.map((p) => <option key={p.id} value={p.name} />)}</datalist>
+                      autoComplete="off"
+                      onChange={(e) => handleProductInput(li.key, e.target.value)}
+                      onFocus={() => setOpenProductKey(li.key)}
+                      onBlur={() => setTimeout(() => setOpenProductKey(null), 200)}
+                      style={S.inpSm} />
+                    {openProductKey === li.key && getFilteredProducts(li.key).length > 0 && (
+                      <div style={S.dropdownWrap}>
+                        {getFilteredProducts(li.key).map((p) => (
+                          <button key={p.id} type="button"
+                            onPointerDown={(e) => { e.preventDefault(); selectProduct(li.key, p); }}
+                            style={{ ...S.dropdownItem, display: "flex", justifyContent: "space-between" }}>
+                            <span>{p.name}</span>
+                            <span style={{ color: "#94a3b8", fontSize: 11 }}>{formatCurrency(p.unit_price)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <input type="number" step="0.001" min="0.001" value={li.quantity}
                     onChange={(e) => updateLineItem(li.key, "quantity", parseFloat(e.target.value) || 1)}
@@ -303,14 +363,26 @@ function NewServiceForm() {
                       <TrashIcon style={{ width: 15, height: 15 }} />
                     </button>
                   </div>
-                  <input type="text" placeholder="Ürün / hizmet adı" value={li.name}
-                    onChange={(e) => {
-                      updateLineItem(li.key, "name", e.target.value);
-                      const match = products.find((p) => p.name === e.target.value);
-                      if (match) { updateLineItem(li.key, "unit_price", match.unit_price); updateLineItem(li.key, "product_id", match.id); }
-                    }}
-                    list={`products-m-${li.key}`} style={{ ...S.inpSm, marginBottom: 8 }} />
-                  <datalist id={`products-m-${li.key}`}>{products.map((p) => <option key={p.id} value={p.name} />)}</datalist>
+                  <div style={{ position: "relative", marginBottom: 8 }}>
+                    <input type="text" placeholder="Ürün / hizmet adı" value={li.name}
+                      autoComplete="off"
+                      onChange={(e) => handleProductInput(li.key, e.target.value)}
+                      onFocus={() => setOpenProductKey(li.key)}
+                      onBlur={() => setTimeout(() => setOpenProductKey(null), 200)}
+                      style={{ ...S.inpSm, fontSize: 15 }} />
+                    {openProductKey === li.key && getFilteredProducts(li.key).length > 0 && (
+                      <div style={{ ...S.dropdownWrap, fontSize: 14 }}>
+                        {getFilteredProducts(li.key).map((p) => (
+                          <button key={p.id} type="button"
+                            onPointerDown={(e) => { e.preventDefault(); selectProduct(li.key, p); }}
+                            style={{ ...S.dropdownItem, display: "flex", justifyContent: "space-between", padding: "11px 14px", fontSize: 14 }}>
+                            <span>{p.name}</span>
+                            <span style={{ color: "#94a3b8", fontSize: 12 }}>{formatCurrency(p.unit_price)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                     <div>
                       <span style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase" as const, display: "block", marginBottom: 4 }}>Adet</span>

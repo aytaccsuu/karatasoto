@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   const supabase = createAdminClient();
   const body = await request.json() as ServiceRecordInput & { kdv_enabled?: boolean; kdv_amount?: number };
 
-  // Toplam hesaplama
+  // Toplam hesaplama (client-side ile aynı mantık)
   const partsTotal = body.line_items.reduce(
     (sum, item) => sum + item.quantity * item.unit_price,
     0
@@ -54,76 +54,37 @@ export async function POST(request: NextRequest) {
   const debtAdded = body.payment_type === "veresiye" ? grandTotal : 0;
   const amountPaid = body.payment_type === "veresiye" ? 0 : grandTotal;
 
-  // Servis kaydini olustur
-  const { data: record, error: recordError } = await supabase
-    .from("service_records")
-    .insert({
-      vehicle_id: body.vehicle_id,
-      customer_id: body.customer_id,
-      service_date: body.service_date,
-      km_at_service: body.km_at_service || null,
-      labor_cost: body.labor_cost || 0,
-      parts_total: partsTotal,
-      grand_total: grandTotal,
-      kdv_enabled: kdvEnabled,
-      kdv_amount: kdvAmount,
-      payment_type: body.payment_type,
-      amount_paid: amountPaid,
-      debt_added: debtAdded,
-      notes: body.notes || null,
-    })
-    .select()
-    .single();
+  // Satır kalemlerini RPC için hazırla
+  const lineItemsJson = body.line_items.map((item, index) => ({
+    product_id: item.product_id || null,
+    name: item.name.trim(),
+    quantity: item.quantity,
+    unit_price: item.unit_price,
+    line_total: item.quantity * item.unit_price,
+    sort_order: index,
+  }));
 
-  if (recordError) {
-    return NextResponse.json({ error: recordError.message }, { status: 400 });
+  // Tek RPC çağrısı: servis + satırlar + borç — hepsi tek DB round-trip
+  const { data, error } = await supabase.rpc("create_service_full", {
+    p_vehicle_id:    body.vehicle_id,
+    p_customer_id:   body.customer_id,
+    p_service_date:  body.service_date,
+    p_km_at_service: body.km_at_service || null,
+    p_labor_cost:    body.labor_cost || 0,
+    p_parts_total:   partsTotal,
+    p_grand_total:   grandTotal,
+    p_kdv_enabled:   kdvEnabled,
+    p_kdv_amount:    kdvAmount,
+    p_payment_type:  body.payment_type,
+    p_amount_paid:   amountPaid,
+    p_debt_added:    debtAdded,
+    p_notes:         body.notes || null,
+    p_line_items:    lineItemsJson,
+  });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  // Satir kalemlerini kaydet
-  if (body.line_items.length > 0) {
-    const lineItemsPayload = body.line_items.map((item, index) => ({
-      service_record_id: record.id,
-      product_id: item.product_id || null,
-      name: item.name.trim(),
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-      line_total: item.quantity * item.unit_price,
-      sort_order: index,
-    }));
-
-    const { error: lineError } = await supabase
-      .from("service_line_items")
-      .insert(lineItemsPayload);
-
-    if (lineError) {
-      return NextResponse.json({ error: lineError.message }, { status: 400 });
-    }
-  }
-
-  // Veresiye ise musterinin borcunu guncelle
-  if (body.payment_type === "veresiye") {
-    const { data: customer } = await supabase
-      .from("customers")
-      .select("total_debt")
-      .eq("id", body.customer_id)
-      .single();
-
-    const newDebt = (customer?.total_debt || 0) + grandTotal;
-
-    await supabase
-      .from("customers")
-      .update({ total_debt: newDebt, updated_at: new Date().toISOString() })
-      .eq("id", body.customer_id);
-
-    await supabase.from("debt_transactions").insert({
-      customer_id: body.customer_id,
-      service_record_id: record.id,
-      transaction_type: "veresiye",
-      amount: grandTotal,
-      description: `Servis - ${record.service_date}`,
-      balance_after: newDebt,
-    });
-  }
-
-  return NextResponse.json({ data: record }, { status: 201 });
+  return NextResponse.json({ data }, { status: 201 });
 }
