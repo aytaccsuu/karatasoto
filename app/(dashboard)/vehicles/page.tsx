@@ -4,22 +4,36 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { PlusIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { getCached, setCached, invalidateCache } from "@/lib/cache";
 import type { Vehicle } from "@/types";
+
+const CACHE_KEY = "vehicles_v1";
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
+  const fetchAll = useCallback(async (background = false) => {
+    if (!background) setLoading(true);
     const res = await fetch("/api/vehicles");
     const data = await res.json();
-    setVehicles(data.data || []);
-    setLoading(false);
+    const list: Vehicle[] = data.data || [];
+    setVehicles(list);
+    setCached(CACHE_KEY, list);
+    if (!background) setLoading(false);
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    const cached = getCached<Vehicle[]>(CACHE_KEY);
+    if (cached) {
+      setVehicles(cached);
+      setLoading(false);
+      fetchAll(true); // arka plan yenileme
+    } else {
+      fetchAll();
+    }
+  }, [fetchAll]);
 
   const filtered = vehicles.filter((v) => {
     const q = search.toLowerCase();
@@ -36,7 +50,8 @@ export default function VehiclesPage() {
     const res = await fetch(`/api/vehicles/${id}`, { method: "DELETE" });
     if (res.ok) {
       toast.success("Arac silindi");
-      fetchAll();
+      setVehicles((prev) => prev.filter((v) => v.id !== id));
+      invalidateCache(CACHE_KEY);
     } else {
       toast.error("Silme basarisiz. Servis kaydi olan araclar silinemez.");
     }

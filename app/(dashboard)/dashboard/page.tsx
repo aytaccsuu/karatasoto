@@ -7,6 +7,7 @@ import {
   BanknotesIcon, ExclamationTriangleIcon, PlusIcon, ArrowRightIcon,
 } from "@heroicons/react/24/outline";
 import { formatCurrency } from "@/lib/utils";
+import { getCached, setCached } from "@/lib/cache";
 import type { DashboardStats } from "@/types";
 
 interface StatCardProps {
@@ -41,6 +42,24 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetch("/api/dashboard").then(r => r.json()).then(d => setStats(d.data)).finally(() => setLoading(false));
+
+    // Arka planda sık kullanılan verileri önceden yükle (prefetch)
+    // Müşteri araması ve servis formu için sessizce cache'e yaz
+    const prefetch = async () => {
+      await Promise.allSettled([
+        !getCached("products_v1") && fetch("/api/products?active=true")
+          .then(r => r.json()).then(d => { if (d.data) setCached("products_v1", d.data); }),
+        !getCached("customers_v1") && fetch("/api/customers")
+          .then(r => r.json()).then(d => { if (d.data) setCached("customers_v1", d.data); }),
+        !getCached("vehicles_v1") && fetch("/api/vehicles")
+          .then(r => r.json()).then(d => { if (d.data) setCached("vehicles_v1", d.data); }),
+        !getCached("services_v1") && fetch("/api/services")
+          .then(r => r.json()).then(d => { if (d.data) setCached("services_v1", d.data); }),
+      ]);
+    };
+    // Dashboard yüklendikten 1 saniye sonra başlat (öne geçmesin)
+    const t = setTimeout(prefetch, 1000);
+    return () => clearTimeout(t);
   }, []);
 
   const today = new Date().toLocaleDateString("tr-TR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });

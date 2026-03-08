@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PlusIcon, MagnifyingGlassIcon, PhoneIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatCurrency } from "@/lib/utils";
+import { getCached, setCached, invalidateCache } from "@/lib/cache";
 import type { Customer } from "@/types";
+
+const CACHE_KEY = "customers_v1";
 
 const S = {
   page: {} as React.CSSProperties,
@@ -31,28 +34,55 @@ const S = {
 
 export default function CustomersPage() {
   const router = useRouter();
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const fetchCustomers = useCallback(async (q: string) => {
-    setLoading(true);
-    const res = await fetch(`/api/customers?search=${encodeURIComponent(q)}`);
+  // Client-side filtreleme — anlık, API çağrısı yok
+  const customers = useMemo(() => {
+    if (!search.trim()) return allCustomers;
+    const q = search.toLowerCase();
+    return allCustomers.filter((c) =>
+      c.first_name.toLowerCase().includes(q) ||
+      c.last_name.toLowerCase().includes(q) ||
+      (c.phone && c.phone.includes(q))
+    );
+  }, [allCustomers, search]);
+
+  async function loadCustomers(background = false) {
+    if (!background) setLoading(true);
+    const res = await fetch("/api/customers");
     const data = await res.json();
-    setCustomers(data.data || []);
-    setLoading(false);
-  }, []);
+    const list: Customer[] = data.data || [];
+    setAllCustomers(list);
+    setCached(CACHE_KEY, list);
+    if (!background) setLoading(false);
+  }
 
   useEffect(() => {
-    const t = setTimeout(() => fetchCustomers(search), 300);
-    return () => clearTimeout(t);
-  }, [search, fetchCustomers]);
+    // Cache varsa anında göster, arka planda tazele
+    const cached = getCached<Customer[]>(CACHE_KEY);
+    if (cached) {
+      setAllCustomers(cached);
+      setLoading(false);
+      loadCustomers(true); // arka plan yenileme
+    } else {
+      loadCustomers();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleDelete(id: string, name: string) {
     if (!confirm(`${name} adlı müşteriyi silmek istediğinize emin misiniz?`)) return;
     const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
-    if (res.ok) { toast.success("Müşteri silindi"); fetchCustomers(search); }
-    else toast.error("Silme işlemi başarısız");
+    if (res.ok) {
+      toast.success("Müşteri silindi");
+      // Optimistik güncelleme + cache temizle
+      setAllCustomers((prev) => prev.filter((c) => c.id !== id));
+      invalidateCache(CACHE_KEY);
+    } else {
+      toast.error("Silme işlemi başarısız");
+    }
   }
 
   return (
@@ -91,7 +121,9 @@ export default function CustomersPage() {
         <div style={S.center}><div style={S.spinner} /></div>
       ) : customers.length === 0 ? (
         <div style={S.empty}>
-          <p style={{ fontSize: 13, color: "#64748b", margin: 0, fontWeight: 500 }}>Müşteri bulunamadı</p>
+          <p style={{ fontSize: 13, color: "#64748b", margin: 0, fontWeight: 500 }}>
+            {search ? `"${search}" için sonuç bulunamadı` : "Müşteri bulunamadı"}
+          </p>
         </div>
       ) : (
         <>

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChevronLeftIcon, PlusIcon, TrashIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatCurrency } from "@/lib/utils";
+import { getCached, setCached } from "@/lib/cache";
 import type { Customer, Vehicle, Product, ServiceLineItemInput } from "@/types";
 
 const S = {
@@ -53,9 +54,10 @@ function NewServiceForm() {
   const searchParams = useSearchParams();
   const preVehicleId = searchParams.get("vehicle_id") || "";
 
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]); // tüm müşteriler, client-side arama için
   const [products, setProducts] = useState<Product[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [customerVehicles, setCustomerVehicles] = useState<Vehicle[]>([]);
@@ -71,31 +73,35 @@ function NewServiceForm() {
     { key: Date.now(), product_id: "", name: "", quantity: 1, unit_price: 0 },
   ]);
   const [openProductKey, setOpenProductKey] = useState<number | null>(null);
-  const customerSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const customerSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null); // artık kullanılmıyor, kaldırılabilir
 
   useEffect(() => {
-    // Ürünleri sessionStorage'dan al — 5 dakika geçerli
-    const CACHE_KEY = "products_v1";
-    const CACHE_TS  = "products_v1_ts";
-    const TTL_MS    = 5 * 60 * 1000; // 5 dakika
-    try {
-      const cached = sessionStorage.getItem(CACHE_KEY);
-      const ts     = Number(sessionStorage.getItem(CACHE_TS) || 0);
-      if (cached && Date.now() - ts < TTL_MS) {
-        setProducts(JSON.parse(cached));
-      } else {
-        fetch("/api/products?active=true")
-          .then((r) => r.json())
-          .then((d) => {
-            const list = d.data || [];
-            setProducts(list);
-            sessionStorage.setItem(CACHE_KEY, JSON.stringify(list));
-            sessionStorage.setItem(CACHE_TS, String(Date.now()));
-          });
-      }
-    } catch {
-      // sessionStorage yoksa (private mode vb.) doğrudan fetch
-      fetch("/api/products?active=true").then((r) => r.json()).then((d) => setProducts(d.data || []));
+    // Ürünleri cache'den al — 5 dakika geçerli
+    const cachedProducts = getCached<Product[]>("products_v1");
+    if (cachedProducts) {
+      setProducts(cachedProducts);
+    } else {
+      fetch("/api/products?active=true")
+        .then((r) => r.json())
+        .then((d) => {
+          const list: Product[] = d.data || [];
+          setProducts(list);
+          setCached("products_v1", list);
+        });
+    }
+
+    // Müşterileri cache'den al — client-side arama için
+    const cachedCustomers = getCached<Customer[]>("customers_v1");
+    if (cachedCustomers) {
+      setAllCustomers(cachedCustomers);
+    } else {
+      fetch("/api/customers")
+        .then((r) => r.json())
+        .then((d) => {
+          const list: Customer[] = d.data || [];
+          setAllCustomers(list);
+          setCached("customers_v1", list);
+        });
     }
 
     if (preVehicleId) {
@@ -115,17 +121,23 @@ function NewServiceForm() {
     }
   }, [preVehicleId]);
 
-  async function searchCustomers(q: string) {
-    if (!q.trim()) { setCustomers([]); return; }
-    const res = await fetch(`/api/customers?search=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    setCustomers(data.data || []);
+  // Client-side müşteri filtreleme — anlık, API çağrısı yok
+  function getMatchingCustomers(): Customer[] {
+    if (!customerSearch.trim()) return [];
+    const q = customerSearch.toLowerCase();
+    return allCustomers
+      .filter((c) =>
+        c.first_name.toLowerCase().includes(q) ||
+        c.last_name.toLowerCase().includes(q) ||
+        (c.phone && c.phone.includes(q))
+      )
+      .slice(0, 10);
   }
 
   async function selectCustomer(c: Customer) {
     setSelectedCustomer(c);
     setCustomerSearch(`${c.first_name} ${c.last_name}`);
-    setCustomers([]);
+    setCustomerDropdownOpen(false);
     setSelectedVehicle(null);
     const res = await fetch(`/api/vehicles?customer_id=${c.id}`);
     const data = await res.json();
@@ -244,18 +256,21 @@ function NewServiceForm() {
                   onChange={(e) => {
                     const val = e.target.value;
                     setCustomerSearch(val);
-                    if (!val) { setSelectedCustomer(null); setSelectedVehicle(null); setCustomers([]); return; }
-                    if (customerSearchRef.current) clearTimeout(customerSearchRef.current);
-                    customerSearchRef.current = setTimeout(() => searchCustomers(val), 300);
+                    if (!val) { setSelectedCustomer(null); setSelectedVehicle(null); }
+                    setCustomerDropdownOpen(!!val);
                   }}
+                  onFocus={() => { if (customerSearch) setCustomerDropdownOpen(true); }}
+                  onBlur={() => setTimeout(() => setCustomerDropdownOpen(false), 200)}
                   placeholder="Müşteri adı ile ara..."
                   style={{ ...S.inp, paddingLeft: 32 }}
                 />
               </div>
-              {customers.length > 0 && (
+              {customerDropdownOpen && getMatchingCustomers().length > 0 && (
                 <div style={S.dropdownWrap}>
-                  {customers.map((c) => (
-                    <button key={c.id} type="button" onClick={() => selectCustomer(c)} style={S.dropdownItem}>
+                  {getMatchingCustomers().map((c) => (
+                    <button key={c.id} type="button"
+                      onPointerDown={(e) => { e.preventDefault(); selectCustomer(c); }}
+                      style={S.dropdownItem}>
                       {c.first_name} {c.last_name}
                       {c.phone && <span style={{ color: "#94a3b8", marginLeft: 8, fontSize: 12 }}>{c.phone}</span>}
                     </button>

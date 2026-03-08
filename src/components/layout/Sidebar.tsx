@@ -36,19 +36,19 @@ function NavList({ onClose }: { onClose?: () => void }) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "10px",
-              padding: "8px 12px",
+              gap: "12px",
+              padding: "10px 14px",
               borderRadius: "8px",
-              fontSize: "13px",
+              fontSize: "15px",
               fontWeight: 500,
               textDecoration: "none",
-              marginBottom: "2px",
+              marginBottom: "3px",
               backgroundColor: isActive ? "#4f46e5" : "transparent",
               color: isActive ? "#ffffff" : "#94a3b8",
               transition: "background-color 0.15s, color 0.15s",
             }}
           >
-            <Icon style={{ width: 16, height: 16, flexShrink: 0, color: isActive ? "#c7d2fe" : "#64748b" }} />
+            <Icon style={{ width: 20, height: 20, flexShrink: 0, color: isActive ? "#c7d2fe" : "#64748b" }} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.label}</span>
           </Link>
         );
@@ -86,7 +86,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   return (
     <>
       <style>{`
-        .sidebar-desktop { width: 208px; flex-shrink: 0; height: 100%; display: block; }
+        .sidebar-desktop { width: 224px; flex-shrink: 0; height: 100%; display: block; }
         @media (max-width: 767px) { .sidebar-desktop { display: none; } }
       `}</style>
 
@@ -102,7 +102,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", zIndex: 20 }}
             onClick={onClose}
           />
-          <div style={{ position: "fixed", top: 0, left: 0, height: "100%", width: 208, zIndex: 30 }}>
+          <div style={{ position: "fixed", top: 0, left: 0, height: "100%", width: 260, zIndex: 30 }}>
             <SidebarContent onClose={onClose} />
           </div>
         </>

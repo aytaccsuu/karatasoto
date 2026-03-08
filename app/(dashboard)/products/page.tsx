@@ -162,31 +162,31 @@ export default function ProductsPage() {
         {/* Mobil kart listesi */}
         <div className="prod-mobile-list">
           {products.map((p) => (
-            <div key={p.id} style={{ backgroundColor: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "12px 14px", opacity: p.is_active ? 1 : 0.5 }}>
+            <div key={p.id} style={{ backgroundColor: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "14px 16px", opacity: p.is_active ? 1 : 0.5 }}>
               {editId === p.id ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Ürün adı" style={{ ...S.editInput, width: "100%" }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Ürün adı" style={{ ...S.editInput, width: "100%", fontSize: 15 }} />
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <input value={editForm.unit} onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })} placeholder="Birim" style={S.editInput} />
-                    <input type="number" step="0.01" value={editForm.unit_price} onChange={(e) => setEditForm({ ...editForm, unit_price: e.target.value })} placeholder="Fiyat" style={{ ...S.editInput, textAlign: "right" }} />
+                    <input value={editForm.unit} onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })} placeholder="Birim" style={{ ...S.editInput, fontSize: 15 }} />
+                    <input type="number" step="0.01" value={editForm.unit_price} onChange={(e) => setEditForm({ ...editForm, unit_price: e.target.value })} placeholder="Fiyat" style={{ ...S.editInput, textAlign: "right", fontSize: 15 }} />
                   </div>
                   <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-                    <button onClick={() => saveEdit(p.id)} style={{ flex: 1, padding: "7px 0", borderRadius: 6, backgroundColor: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Kaydet</button>
-                    <button onClick={() => setEditId(null)} style={{ flex: 1, padding: "7px 0", borderRadius: 6, backgroundColor: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>İptal</button>
+                    <button onClick={() => saveEdit(p.id)} style={{ flex: 1, padding: "9px 0", borderRadius: 6, backgroundColor: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Kaydet</button>
+                    <button onClick={() => setEditId(null)} style={{ flex: 1, padding: "9px 0", borderRadius: 6, backgroundColor: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>İptal</button>
                   </div>
                 </div>
               ) : (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <div style={{ fontWeight: 600, color: "#1e293b", fontSize: 14 }}>{p.name}</div>
-                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{formatCurrency(p.unit_price)} / {p.unit}</div>
-                    <span style={{ display: "inline-flex", alignItems: "center", marginTop: 4, padding: "1px 7px", borderRadius: 5, fontSize: 10, fontWeight: 600, ...(p.is_active ? { backgroundColor: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" } : { backgroundColor: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }) }}>
+                    <div style={{ fontWeight: 600, color: "#1e293b", fontSize: 16 }}>{p.name}</div>
+                    <div style={{ fontSize: 14, color: "#64748b", marginTop: 3 }}>{formatCurrency(p.unit_price)} / {p.unit}</div>
+                    <span style={{ display: "inline-flex", alignItems: "center", marginTop: 6, padding: "2px 9px", borderRadius: 5, fontSize: 12, fontWeight: 600, ...(p.is_active ? { backgroundColor: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" } : { backgroundColor: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }) }}>
                       {p.is_active ? "Aktif" : "Pasif"}
                     </span>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                    <button onClick={() => startEdit(p)} style={{ fontSize: 12, fontWeight: 600, color: "#4f46e5", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Düzenle</button>
-                    <button onClick={() => toggleActive(p)} style={{ fontSize: 12, fontWeight: 600, color: "#d97706", background: "none", border: "none", cursor: "pointer", padding: 0 }}>{p.is_active ? "Deaktif" : "Aktif Et"}</button>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-end" }}>
+                    <button onClick={() => startEdit(p)} style={{ fontSize: 14, fontWeight: 600, color: "#4f46e5", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Düzenle</button>
+                    <button onClick={() => toggleActive(p)} style={{ fontSize: 14, fontWeight: 600, color: "#d97706", background: "none", border: "none", cursor: "pointer", padding: 0 }}>{p.is_active ? "Deaktif" : "Aktif Et"}</button>
                   </div>
                 </div>
               )}

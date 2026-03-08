@@ -5,7 +5,10 @@ import Link from "next/link";
 import { PlusIcon, FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatCurrency, formatDate, PAYMENT_TYPE_LABELS } from "@/lib/utils";
+import { getCached, setCached } from "@/lib/cache";
 import type { ServiceRecord } from "@/types";
+
+const CACHE_KEY = "services_v1";
 
 const BADGE_STYLE: Record<string, React.CSSProperties> = {
   veresiye: { backgroundColor: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" },
@@ -41,19 +44,34 @@ export default function ServicesPage() {
   const [toDate, setToDate] = useState("");
   const [payFilter, setPayFilter] = useState("");
 
-  const fetchServices = useCallback(async () => {
-    setLoading(true);
+  const fetchServices = useCallback(async (background = false) => {
+    if (!background) setLoading(true);
     const params = new URLSearchParams();
     if (fromDate) params.set("from", fromDate);
     if (toDate) params.set("to", toDate);
     if (payFilter) params.set("payment_type", payFilter);
     const res = await fetch(`/api/services?${params.toString()}`);
     const data = await res.json();
-    setServices(data.data || []);
-    setLoading(false);
+    const list: ServiceRecord[] = data.data || [];
+    setServices(list);
+    // Yalnızca filtre yokken cache güncelle
+    if (!fromDate && !toDate && !payFilter) setCached(CACHE_KEY, list);
+    if (!background) setLoading(false);
   }, [fromDate, toDate, payFilter]);
 
-  useEffect(() => { fetchServices(); }, [fetchServices]);
+  useEffect(() => {
+    const noFilters = !fromDate && !toDate && !payFilter;
+    if (noFilters) {
+      const cached = getCached<ServiceRecord[]>(CACHE_KEY);
+      if (cached) {
+        setServices(cached);
+        setLoading(false);
+        fetchServices(true); // arka plan yenileme
+        return;
+      }
+    }
+    fetchServices();
+  }, [fetchServices, fromDate, toDate, payFilter]);
 
   async function handleDelete(id: string) {
     if (!confirm("Bu servis kaydını silmek istediğinize emin misiniz?")) return;
