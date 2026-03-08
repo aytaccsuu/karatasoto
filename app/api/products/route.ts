@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
       name: body.name.trim(),
       unit_price: Number(body.unit_price),
       unit: body.unit || "adet",
+      is_active: true,
     })
     .select()
     .single();
