@@ -7,6 +7,7 @@ import { PlusIcon, MagnifyingGlassIcon, PhoneIcon } from "@heroicons/react/24/ou
 import toast from "react-hot-toast";
 import { formatCurrency } from "@/lib/utils";
 import { getCached, setCached, invalidateCache } from "@/lib/cache";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import type { Customer } from "@/types";
 
 const CACHE_KEY = "customers_v1";
@@ -37,8 +38,9 @@ export default function CustomersPage() {
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
-  // Client-side filtreleme — anlık, API çağrısı yok
   const customers = useMemo(() => {
     if (!search.trim()) return allCustomers;
     const q = search.toLowerCase();
@@ -60,29 +62,34 @@ export default function CustomersPage() {
   }
 
   useEffect(() => {
-    // Cache varsa anında göster, arka planda tazele
     const cached = getCached<Customer[]>(CACHE_KEY);
     if (cached) {
       setAllCustomers(cached);
       setLoading(false);
-      loadCustomers(true); // arka plan yenileme
+      loadCustomers(true);
     } else {
       loadCustomers();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleDelete(id: string, name: string) {
-    if (!confirm(`${name} adlı müşteriyi silmek istediğinize emin misiniz?`)) return;
-    const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
+  function askDelete(id: string, name: string) {
+    setConfirmTarget({ id, name });
+    setConfirmOpen(true);
+  }
+
+  async function executeDelete() {
+    if (!confirmTarget) return;
+    const res = await fetch(`/api/customers/${confirmTarget.id}`, { method: "DELETE" });
     if (res.ok) {
       toast.success("Müşteri silindi");
-      // Optimistik güncelleme + cache temizle
-      setAllCustomers((prev) => prev.filter((c) => c.id !== id));
+      setAllCustomers((prev) => prev.filter((c) => c.id !== confirmTarget.id));
       invalidateCache(CACHE_KEY);
     } else {
       toast.error("Silme işlemi başarısız");
     }
+    setConfirmOpen(false);
+    setConfirmTarget(null);
   }
 
   return (
@@ -97,6 +104,16 @@ export default function CustomersPage() {
           .cust-mobile-list { display: flex; flex-direction: column; gap: 8px; }
         }
       `}</style>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Müşteriyi Sil"
+        message={confirmTarget ? `${confirmTarget.name} adlı müşteriyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.` : ""}
+        confirmLabel="Evet, Sil"
+        onConfirm={executeDelete}
+        onCancel={() => { setConfirmOpen(false); setConfirmTarget(null); }}
+      />
+
       <div style={S.header}>
         <div>
           <h1 style={S.h1}>Müşteriler</h1>
@@ -165,7 +182,7 @@ export default function CustomersPage() {
                       <td style={S.td}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
                           <button onClick={() => router.push(`/customers/${c.id}/edit`)} style={{ fontSize: 12, fontWeight: 600, color: "#4f46e5", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Düzenle</button>
-                          <button onClick={() => handleDelete(c.id, `${c.first_name} ${c.last_name}`)} style={{ fontSize: 12, fontWeight: 600, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sil</button>
+                          <button onClick={() => askDelete(c.id, `${c.first_name} ${c.last_name}`)} style={{ fontSize: 12, fontWeight: 600, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sil</button>
                         </div>
                       </td>
                     </tr>
@@ -193,7 +210,7 @@ export default function CustomersPage() {
                     )}
                     <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                       <button onClick={() => router.push(`/customers/${c.id}/edit`)} style={{ fontSize: 12, fontWeight: 600, color: "#4f46e5", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Düzenle</button>
-                      <button onClick={() => handleDelete(c.id, `${c.first_name} ${c.last_name}`)} style={{ fontSize: 12, fontWeight: 600, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sil</button>
+                      <button onClick={() => askDelete(c.id, `${c.first_name} ${c.last_name}`)} style={{ fontSize: 12, fontWeight: 600, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sil</button>
                     </div>
                   </div>
                 </div>

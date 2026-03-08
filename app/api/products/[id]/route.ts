@@ -36,13 +36,24 @@ export async function DELETE(
   const { id } = await params;
   const supabase = createAdminClient();
 
-  const { error } = await supabase
+  // Önce hard delete dene; FK kısıtlaması varsa soft delete (is_active=false)
+  const { error: hardError } = await supabase
     .from("products")
-    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .delete()
     .eq("id", id);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  if (hardError) {
+    // FK violation — sadece pasife al
+    const { error: softError } = await supabase
+      .from("products")
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq("id", id);
+
+    if (softError) {
+      return NextResponse.json({ error: softError.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, soft: true });
   }
 
   return NextResponse.json({ success: true });

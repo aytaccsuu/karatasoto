@@ -52,8 +52,13 @@ export async function middleware(request: NextRequest) {
     pathname === '/forgot-password' ||
     pathname === '/reset-password';
 
-  // Giriş yapmamış kullanıcı → login'e yönlendir (auth sayfaları hariç)
+  // Giriş yapmamış kullanıcı
   if (!user && !isAuthPage) {
+    // API rotaları → 401 JSON (HTML redirect değil)
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    // Sayfa rotaları → login'e yönlendir
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);

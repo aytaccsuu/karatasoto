@@ -6,6 +6,7 @@ import { PlusIcon, FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatCurrency, formatDate, PAYMENT_TYPE_LABELS } from "@/lib/utils";
 import { getCached, setCached } from "@/lib/cache";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import type { ServiceRecord } from "@/types";
 
 const CACHE_KEY = "services_v1";
@@ -43,6 +44,8 @@ export default function ServicesPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [payFilter, setPayFilter] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const fetchServices = useCallback(async (background = false) => {
     if (!background) setLoading(true);
@@ -54,7 +57,6 @@ export default function ServicesPage() {
     const data = await res.json();
     const list: ServiceRecord[] = data.data || [];
     setServices(list);
-    // Yalnızca filtre yokken cache güncelle
     if (!fromDate && !toDate && !payFilter) setCached(CACHE_KEY, list);
     if (!background) setLoading(false);
   }, [fromDate, toDate, payFilter]);
@@ -66,18 +68,25 @@ export default function ServicesPage() {
       if (cached) {
         setServices(cached);
         setLoading(false);
-        fetchServices(true); // arka plan yenileme
+        fetchServices(true);
         return;
       }
     }
     fetchServices();
   }, [fetchServices, fromDate, toDate, payFilter]);
 
-  async function handleDelete(id: string) {
-    if (!confirm("Bu servis kaydını silmek istediğinize emin misiniz?")) return;
-    const res = await fetch(`/api/services/${id}`, { method: "DELETE" });
+  function askDelete(id: string) {
+    setDeleteTargetId(id);
+    setConfirmOpen(true);
+  }
+
+  async function executeDelete() {
+    if (!deleteTargetId) return;
+    const res = await fetch(`/api/services/${deleteTargetId}`, { method: "DELETE" });
     if (res.ok) { toast.success("Servis kaydı silindi"); fetchServices(); }
     else toast.error("Silme başarısız");
+    setConfirmOpen(false);
+    setDeleteTargetId(null);
   }
 
   const total = services.reduce((s, r) => s + r.grand_total, 0);
@@ -95,6 +104,16 @@ export default function ServicesPage() {
           .svc-mobile-list { display: flex; flex-direction: column; gap: 8px; }
         }
       `}</style>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Servis Kaydını Sil"
+        message="Bu servis kaydını silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
+        confirmLabel="Evet, Sil"
+        onConfirm={executeDelete}
+        onCancel={() => { setConfirmOpen(false); setDeleteTargetId(null); }}
+      />
+
       <div style={S.header}>
         <div>
           <h1 style={S.h1}>Servis Kayıtları</h1>
@@ -183,7 +202,7 @@ export default function ServicesPage() {
                         <td style={S.td}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
                             <Link href={`/services/${s.id}`} style={{ fontSize: 12, fontWeight: 600, color: "#4f46e5", textDecoration: "none" }}>Detay</Link>
-                            <button onClick={() => handleDelete(s.id)} style={{ fontSize: 12, fontWeight: 600, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sil</button>
+                            <button onClick={() => askDelete(s.id)} style={{ fontSize: 12, fontWeight: 600, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sil</button>
                           </div>
                         </td>
                       </tr>
@@ -220,7 +239,7 @@ export default function ServicesPage() {
                       <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{formatCurrency(s.grand_total)}</div>
                       <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 4 }}>
                         <Link href={`/services/${s.id}`} style={{ fontSize: 12, fontWeight: 600, color: "#4f46e5", textDecoration: "none" }}>Detay</Link>
-                        <button onClick={() => handleDelete(s.id)} style={{ fontSize: 12, fontWeight: 600, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sil</button>
+                        <button onClick={() => askDelete(s.id)} style={{ fontSize: 12, fontWeight: 600, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sil</button>
                       </div>
                     </div>
                   </div>

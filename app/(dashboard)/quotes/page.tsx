@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { getCached, setCached } from "@/lib/cache";
+
+const CACHE_KEY = "quotes_v1";
 
 interface QuoteLineItem {
   name: string;
@@ -51,28 +54,39 @@ const S = {
   thR: { textAlign: "right" as const, padding: "10px 16px", fontSize: 10, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.05em", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" },
   td: { padding: "11px 16px", borderBottom: "1px solid #f8fafc", fontSize: 13, color: "#334155" } as React.CSSProperties,
   tdR: { padding: "11px 16px", borderBottom: "1px solid #f8fafc", fontSize: 13, textAlign: "right" as const } as React.CSSProperties,
+  center: { display: "flex", justifyContent: "center", padding: "48px 0" } as React.CSSProperties,
+  spinner: { width: 24, height: 24, border: "3px solid #e2e8f0", borderTopColor: "#4f46e5", borderRadius: "50%", animation: "spin 0.7s linear infinite" } as React.CSSProperties,
 };
 
 export default function QuotesPage() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/quotes")
-      .then((r) => r.json())
-      .then((d) => { setQuotes(d.data || []); setLoading(false); });
+  const fetchQuotes = useCallback(async (background = false) => {
+    if (!background) setLoading(true);
+    const res = await fetch("/api/quotes");
+    const data = await res.json();
+    const list: Quote[] = data.data || [];
+    setQuotes(list);
+    setCached(CACHE_KEY, list);
+    if (!background) setLoading(false);
   }, []);
 
-  if (loading) return (
-    <div style={{ display: "flex", justifyContent: "center", padding: "48px 0" }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      <div style={{ width: 24, height: 24, border: "3px solid #e2e8f0", borderTopColor: "#4f46e5", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-    </div>
-  );
+  useEffect(() => {
+    const cached = getCached<Quote[]>(CACHE_KEY);
+    if (cached) {
+      setQuotes(cached);
+      setLoading(false);
+      fetchQuotes(true); // arka plan yenileme
+    } else {
+      fetchQuotes();
+    }
+  }, [fetchQuotes]);
 
   return (
     <div>
       <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
         .qt-table-card { display: block; }
         .qt-mobile-list { display: none; }
         @media (max-width: 640px) {
@@ -80,10 +94,11 @@ export default function QuotesPage() {
           .qt-mobile-list { display: flex; flex-direction: column; gap: 8px; }
         }
       `}</style>
+
       <div style={S.header}>
         <div>
           <h1 style={S.h1}>Fiyat Teklifleri</h1>
-          <p style={S.sub}>{quotes.length} teklif</p>
+          {!loading && <p style={S.sub}>{quotes.length} teklif</p>}
         </div>
         <Link href="/quotes/new" style={S.btnPrimary}>
           <PlusIcon style={{ width: 15, height: 15 }} />
@@ -91,7 +106,9 @@ export default function QuotesPage() {
         </Link>
       </div>
 
-      {quotes.length === 0 ? (
+      {loading ? (
+        <div style={S.center}><div style={S.spinner} /></div>
+      ) : quotes.length === 0 ? (
         <div style={{ ...S.card, padding: 40, textAlign: "center" }}>
           <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>Henüz fiyat teklifi yok.</p>
           <Link href="/quotes/new" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 12, backgroundColor: "#4f46e5", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>

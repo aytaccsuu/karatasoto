@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PlusIcon, CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatCurrency } from "@/lib/utils";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import type { Product } from "@/types";
 
 const S = {
@@ -32,6 +33,8 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [editId, setEditId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: "", unit_price: "", unit: "" });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -65,6 +68,24 @@ export default function ProductsPage() {
     else toast.error("Güncelleme başarısız");
   }
 
+  function askDelete(id: string, name: string) {
+    setDeleteTarget({ id, name });
+    setConfirmOpen(true);
+  }
+
+  async function executeDelete() {
+    if (!deleteTarget) return;
+    const res = await fetch(`/api/products/${deleteTarget.id}`, { method: "DELETE" });
+    if (res.ok) {
+      toast.success("Ürün silindi");
+      setProducts((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+    } else {
+      toast.error("Silme başarısız. Bu ürün servis kayıtlarında kullanılmış olabilir.");
+    }
+    setConfirmOpen(false);
+    setDeleteTarget(null);
+  }
+
   const activeCount = products.filter(p => p.is_active).length;
 
   return (
@@ -79,6 +100,16 @@ export default function ProductsPage() {
           .prod-mobile-list { display: flex; flex-direction: column; gap: 8px; }
         }
       `}</style>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Ürünü Sil"
+        message={deleteTarget ? `"${deleteTarget.name}" ürününü kalıcı olarak silmek istediğinize emin misiniz?` : ""}
+        confirmLabel="Evet, Sil"
+        onConfirm={executeDelete}
+        onCancel={() => { setConfirmOpen(false); setDeleteTarget(null); }}
+      />
+
       <div style={S.header}>
         <div>
           <h1 style={S.h1}>Ürünler / İşçilik</h1>
@@ -107,7 +138,7 @@ export default function ProductsPage() {
                   <th style={S.th}>Birim</th>
                   <th style={S.thR}>Fiyat</th>
                   <th style={S.thC}>Durum</th>
-                  <th style={{ ...S.th, width: 130 }}></th>
+                  <th style={{ ...S.th, width: 160 }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -148,6 +179,7 @@ export default function ProductsPage() {
                           <>
                             <button onClick={() => startEdit(p)} style={{ fontSize: 12, fontWeight: 600, color: "#4f46e5", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Düzenle</button>
                             <button onClick={() => toggleActive(p)} style={{ fontSize: 12, fontWeight: 600, color: "#d97706", background: "none", border: "none", cursor: "pointer", padding: 0 }}>{p.is_active ? "Deaktif" : "Aktif Et"}</button>
+                            <button onClick={() => askDelete(p.id, p.name)} style={{ fontSize: 12, fontWeight: 600, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sil</button>
                           </>
                         )}
                       </div>
@@ -187,6 +219,7 @@ export default function ProductsPage() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-end" }}>
                     <button onClick={() => startEdit(p)} style={{ fontSize: 14, fontWeight: 600, color: "#4f46e5", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Düzenle</button>
                     <button onClick={() => toggleActive(p)} style={{ fontSize: 14, fontWeight: 600, color: "#d97706", background: "none", border: "none", cursor: "pointer", padding: 0 }}>{p.is_active ? "Deaktif" : "Aktif Et"}</button>
+                    <button onClick={() => askDelete(p.id, p.name)} style={{ fontSize: 14, fontWeight: 600, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Sil</button>
                   </div>
                 </div>
               )}

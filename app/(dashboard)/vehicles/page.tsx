@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PlusIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { getCached, setCached, invalidateCache } from "@/lib/cache";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import type { Vehicle } from "@/types";
 
 const CACHE_KEY = "vehicles_v1";
@@ -13,6 +14,8 @@ export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; plate: string } | null>(null);
 
   const fetchAll = useCallback(async (background = false) => {
     if (!background) setLoading(true);
@@ -29,7 +32,7 @@ export default function VehiclesPage() {
     if (cached) {
       setVehicles(cached);
       setLoading(false);
-      fetchAll(true); // arka plan yenileme
+      fetchAll(true);
     } else {
       fetchAll();
     }
@@ -45,26 +48,46 @@ export default function VehiclesPage() {
     );
   });
 
-  async function handleDelete(id: string, plate: string) {
-    if (!confirm(`${plate} plakalı aracı silmek istediginize emin misiniz?`)) return;
-    const res = await fetch(`/api/vehicles/${id}`, { method: "DELETE" });
+  function askDelete(id: string, plate: string) {
+    setConfirmTarget({ id, plate });
+    setConfirmOpen(true);
+  }
+
+  async function executeDelete() {
+    if (!confirmTarget) return;
+    const res = await fetch(`/api/vehicles/${confirmTarget.id}`, { method: "DELETE" });
     if (res.ok) {
-      toast.success("Arac silindi");
-      setVehicles((prev) => prev.filter((v) => v.id !== id));
+      toast.success("Araç silindi");
+      setVehicles((prev) => prev.filter((v) => v.id !== confirmTarget.id));
       invalidateCache(CACHE_KEY);
     } else {
-      toast.error("Silme basarisiz. Servis kaydi olan araclar silinemez.");
+      toast.error("Silme başarısız. Servis kaydı olan araçlar silinemez.");
     }
+    setConfirmOpen(false);
+    setConfirmTarget(null);
   }
 
   return (
     <div>
+      <style>{`
+        tr:hover td { background-color: #f8fafc; }
+      `}</style>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Aracı Sil"
+        message={confirmTarget ? `${confirmTarget.plate} plakalı aracı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.` : ""}
+        confirmLabel="Evet, Sil"
+        onConfirm={executeDelete}
+        onCancel={() => { setConfirmOpen(false); setConfirmTarget(null); }}
+      />
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Araclar</h1>
+        <h1 className="text-xl font-bold text-gray-900">Araçlar</h1>
         <Link href="/vehicles/new"
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors w-fit">
           <PlusIcon className="w-4 h-4" />
-          Yeni Arac
+          Yeni Araç
         </Link>
       </div>
 
@@ -72,7 +95,7 @@ export default function VehiclesPage() {
         <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input
           type="text"
-          placeholder="Plaka, marka, model veya musteri..."
+          placeholder="Plaka, marka, model veya müşteri..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -84,7 +107,7 @@ export default function VehiclesPage() {
           <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">Arac bulunamadi.</div>
+        <div className="text-center py-12 text-gray-500">Araç bulunamadı.</div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -93,7 +116,7 @@ export default function VehiclesPage() {
                 <tr>
                   <th className="text-left px-4 py-3 text-gray-600 font-medium">Plaka</th>
                   <th className="text-left px-4 py-3 text-gray-600 font-medium">Marka/Model</th>
-                  <th className="text-left px-4 py-3 text-gray-600 font-medium">Musteri</th>
+                  <th className="text-left px-4 py-3 text-gray-600 font-medium">Müşteri</th>
                   <th className="text-right px-4 py-3 text-gray-600 font-medium">KM</th>
                   <th className="px-4 py-3"></th>
                 </tr>
@@ -119,8 +142,8 @@ export default function VehiclesPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Link href={`/vehicles/${v.id}/edit`} className="text-xs text-blue-600 hover:underline">Duzenle</Link>
-                        <button onClick={() => handleDelete(v.id, v.plate)} className="text-xs text-red-500 hover:underline">Sil</button>
+                        <Link href={`/vehicles/${v.id}/edit`} className="text-xs text-blue-600 hover:underline">Düzenle</Link>
+                        <button onClick={() => askDelete(v.id, v.plate)} className="text-xs text-red-500 hover:underline">Sil</button>
                       </div>
                     </td>
                   </tr>
