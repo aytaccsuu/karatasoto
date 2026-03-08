@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChevronLeftIcon, TrashIcon, DocumentArrowDownIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 interface QuoteLineItem {
   name: string;
@@ -82,6 +83,7 @@ export default function QuoteDetailPage() {
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function load() {
     const res = await fetch(`/api/quotes/${id}`);
@@ -126,9 +128,9 @@ export default function QuoteDetailPage() {
     setPdfLoading(false);
   }
 
-  async function handleDelete() {
-    if (!confirm("Bu teklifi silmek istediğinize emin misiniz?")) return;
+  async function executeDelete() {
     const res = await fetch(`/api/quotes/${id}`, { method: "DELETE" });
+    setConfirmOpen(false);
     if (res.ok) {
       toast.success("Teklif silindi");
       router.push("/quotes");
@@ -144,6 +146,7 @@ export default function QuoteDetailPage() {
     </div>
   );
 
+
   if (!quote) return <p style={{ color: "#64748b", fontSize: 13 }}>Teklif bulunamadı.</p>;
 
   const partsTotal = (quote.line_items || []).reduce((s, li) => s + li.line_total, 0);
@@ -151,6 +154,15 @@ export default function QuoteDetailPage() {
   return (
     <div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Teklifi Sil"
+        message={`${quote.quote_number} numaralı teklifi kalıcı olarak silmek istediğinize emin misiniz?`}
+        confirmLabel="Evet, Sil"
+        onConfirm={executeDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
 
       <div style={S.backRow}>
         <Link href="/quotes" style={S.backBtn}>
@@ -170,7 +182,7 @@ export default function QuoteDetailPage() {
               <DocumentArrowDownIcon style={{ width: 14, height: 14 }} />
               {pdfLoading ? "..." : "PDF İndir"}
             </button>
-            <button onClick={handleDelete} style={S.deleteBtn}>
+            <button onClick={() => setConfirmOpen(true)} style={S.deleteBtn}>
               <TrashIcon style={{ width: 14, height: 14 }} /> Sil
             </button>
           </div>

@@ -38,7 +38,7 @@ export default function ProductsPage() {
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/products");
+    const res = await fetch("/api/products?active=true");
     const data = await res.json();
     setProducts(data.data || []);
     setLoading(false);

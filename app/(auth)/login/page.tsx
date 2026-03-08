@@ -77,13 +77,16 @@ export default function LoginPage() {
           </div>
 
           {/* Beni Hatırla */}
-          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
-            <div onClick={() => setRememberMe(!rememberMe)} style={{
+          <div
+            onClick={() => setRememberMe((r) => !r)}
+            style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}
+          >
+            <div style={{
               width: 18, height: 18, borderRadius: 4,
               border: rememberMe ? "2px solid #4f46e5" : "2px solid #d1d5db",
               backgroundColor: rememberMe ? "#4f46e5" : "#fff",
               display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0, cursor: "pointer",
+              flexShrink: 0, transition: "all 0.15s",
             }}>
               {rememberMe && (
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -91,9 +94,8 @@ export default function LoginPage() {
                 </svg>
               )}
             </div>
-            <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} style={{ display: "none" }} />
             <span style={{ fontSize: 13, color: "#4b5563", fontWeight: 500 }}>Beni Hatırla</span>
-          </label>
+          </div>
 
           <button type="submit" disabled={loading} style={{
             width: "100%", backgroundColor: loading ? "#a5b4fc" : "#4f46e5",
