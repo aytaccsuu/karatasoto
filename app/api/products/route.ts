@@ -23,9 +23,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Ürünler nadiren değişir — 5 dakika browser cache
   return NextResponse.json({ data }, {
-    headers: { "Cache-Control": "private, max-age=300, stale-while-revalidate=60" },
+    headers: { "Cache-Control": "no-store" },
   });
 }
 
