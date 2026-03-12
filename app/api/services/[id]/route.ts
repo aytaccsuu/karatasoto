@@ -15,7 +15,8 @@ export async function GET(
       vehicle:vehicles(*, customer:customers(*)),
       customer:customers(*),
       line_items:service_line_items(*),
-      debt_transactions(*)`
+      debt_transactions(*),
+      service_item_audit(*)`
     )
     .eq("id", id)
     .single();
