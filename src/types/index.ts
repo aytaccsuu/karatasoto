@@ -32,7 +32,7 @@ export interface Product {
   updated_at: string;
 }
 
-export type PaymentType = 'nakit' | 'kredi_karti' | 'veresiye';
+export type PaymentType = 'nakit' | 'kredi_karti' | 'veresiye' | 'eft_havale';
 
 export interface ServiceLineItem {
   id: string;

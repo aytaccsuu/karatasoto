@@ -30,6 +30,14 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
 
 export const PAYMENT_TYPE_LABELS: Record<string, string> = {
   nakit: 'Nakit',
-  kredi_karti: 'Kredi Karti',
+  kredi_karti: 'Kredi Kartı',
   veresiye: 'Veresiye',
+  eft_havale: 'EFT/Havale',
+};
+
+export const PAYMENT_TYPE_COLORS: Record<string, string> = {
+  nakit: '#16a34a',
+  kredi_karti: '#2563eb',
+  veresiye: '#dc2626',
+  eft_havale: '#7c3aed',
 };

@@ -31,8 +31,9 @@ export async function GET(request: NextRequest) {
 
   const PAYMENT_LABELS: Record<string, string> = {
     nakit: "Nakit",
-    kredi_karti: "Kredi Karti",
+    kredi_karti: "Kredi Kartı",
     veresiye: "Veresiye",
+    eft_havale: "EFT/Havale",
   };
 
   const rows = (records || []).map((r) => ({

@@ -66,7 +66,7 @@ function NewServiceForm() {
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().split("T")[0]);
   const [kmAtService, setKmAtService] = useState("");
   const [laborCost, setLaborCost] = useState("");
-  const [paymentType, setPaymentType] = useState<"nakit" | "kredi_karti" | "veresiye">("nakit");
+  const [paymentType, setPaymentType] = useState<"nakit" | "kredi_karti" | "veresiye" | "eft_havale">("nakit");
   const [notes, setNotes] = useState("");
   const [kdvEnabled, setKdvEnabled] = useState(false);
   const [lineItems, setLineItems] = useState<(ServiceLineItemInput & { key: number })[]>([
@@ -476,9 +476,10 @@ function NewServiceForm() {
         <div style={S.card}>
           <div style={S.cardBody}>
             <p style={S.cardTitle}>Ödeme Türü</p>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <button type="button" onClick={() => setPaymentType("nakit")} style={S.ptBtn(paymentType === "nakit", "#16a34a")}>Nakit</button>
               <button type="button" onClick={() => setPaymentType("kredi_karti")} style={S.ptBtn(paymentType === "kredi_karti", "#2563eb")}>Kredi Kartı</button>
+              <button type="button" onClick={() => setPaymentType("eft_havale")} style={S.ptBtn(paymentType === "eft_havale", "#7c3aed")}>EFT/Havale</button>
               <button type="button" onClick={() => setPaymentType("veresiye")} style={S.ptBtn(paymentType === "veresiye", "#dc2626")}>Veresiye</button>
             </div>
             {paymentType === "veresiye" && (

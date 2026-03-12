@@ -221,7 +221,7 @@ export default function ServiceDetailPage() {
   const payments = transactions.filter((t) => t.transaction_type === "odeme");
   const totalPaid = payments.reduce((sum, t) => sum + Math.abs(t.amount), 0);
   const isVeresiye = record.payment_type === "veresiye";
-  const paymentColor = record.payment_type === "veresiye" ? "#dc2626" : record.payment_type === "nakit" ? "#16a34a" : "#2563eb";
+  const paymentColor = record.payment_type === "veresiye" ? "#dc2626" : record.payment_type === "nakit" ? "#16a34a" : record.payment_type === "eft_havale" ? "#7c3aed" : "#2563eb";
   const rec = record as ServiceRecordFull & { kdv_enabled?: boolean; kdv_amount?: number };
 
   return (
