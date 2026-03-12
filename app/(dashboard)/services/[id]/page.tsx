@@ -78,6 +78,9 @@ export default function ServiceDetailPage() {
   const [addForm, setAddForm] = useState<AddForm>({ product_id: "", name: "", quantity: "1", unit_price: "", note: "" });
   const [addLoading, setAddLoading] = useState(false);
   const [showAddRow, setShowAddRow] = useState(false);
+  // Ödeme türü düzenleme
+  const [editPayType, setEditPayType] = useState(false);
+  const [payTypeLoading, setPayTypeLoading] = useState(false);
 
   const fetchRecord = useCallback(() => {
     setLoading(true);
@@ -118,6 +121,24 @@ export default function ServiceDetailPage() {
       name: p?.name || "",
       unit_price: p?.unit_price?.toString() || "",
     }));
+  }
+
+  async function handlePayTypeChange(newType: string) {
+    setPayTypeLoading(true);
+    const res = await fetch(`/api/services/${id}/payment-type`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payment_type: newType }),
+    });
+    if (res.ok) {
+      toast.success("Ödeme türü güncellendi");
+      setEditPayType(false);
+      fetchRecord();
+    } else {
+      const d = await res.json();
+      toast.error(d.error || "Güncellenemedi");
+    }
+    setPayTypeLoading(false);
   }
 
   async function handleAddItem() {
@@ -464,9 +485,53 @@ export default function ServiceDetailPage() {
                 <span>GENEL TOPLAM:</span>
                 <span style={{ color: "#4f46e5" }}>{formatCurrency(record.grand_total)}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, paddingTop: 2 }}>
-                <span style={{ color: "#64748b" }}>Ödeme Türü:</span>
-                <span style={{ fontWeight: 600, color: paymentColor }}>{PAYMENT_TYPE_LABELS[record.payment_type]}</span>
+              <div style={{ paddingTop: 2 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: editPayType ? 8 : 0 }}>
+                  <span style={{ color: "#64748b", fontSize: 13 }}>Ödeme Türü:</span>
+                  {!editPayType ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontWeight: 600, color: paymentColor, fontSize: 13 }}>{PAYMENT_TYPE_LABELS[record.payment_type]}</span>
+                      <button
+                        onClick={() => setEditPayType(true)}
+                        style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#4f46e5", background: "#eef2ff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer", fontWeight: 600 }}>
+                        <PencilSquareIcon style={{ width: 11, height: 11 }} />
+                        Değiştir
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setEditPayType(false)}
+                      style={{ fontSize: 10, color: "#64748b", background: "#f1f5f9", border: "none", borderRadius: 4, padding: "2px 8px", cursor: "pointer" }}>
+                      İptal
+                    </button>
+                  )}
+                </div>
+                {editPayType && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {([
+                      { key: "nakit",       label: "Nakit",       color: "#16a34a", bg: "#f0fdf4" },
+                      { key: "kredi_karti", label: "Kredi Kartı", color: "#2563eb", bg: "#eff6ff" },
+                      { key: "eft_havale",  label: "EFT/Havale",  color: "#7c3aed", bg: "#f5f3ff" },
+                      { key: "veresiye",    label: "Veresiye",    color: "#dc2626", bg: "#fef2f2" },
+                    ] as const).map(({ key, label, color, bg }) => {
+                      const isActive = record.payment_type === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          disabled={isActive || payTypeLoading}
+                          onClick={() => handlePayTypeChange(key)}
+                          style={{ flex: 1, minWidth: 70, padding: "6px 4px", borderRadius: 7, fontSize: 11, fontWeight: 700,
+                            border: isActive ? `2px solid ${color}` : "1px solid #e2e8f0",
+                            backgroundColor: isActive ? bg : "#fafafa",
+                            color: isActive ? color : "#94a3b8",
+                            cursor: isActive || payTypeLoading ? "default" : "pointer",
+                            opacity: payTypeLoading && !isActive ? 0.5 : 1 }}>
+                          {payTypeLoading && !isActive ? "..." : label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               {isVeresiye && (
                 <>

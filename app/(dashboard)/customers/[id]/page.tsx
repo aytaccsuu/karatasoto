@@ -20,6 +20,7 @@ const PAYMENT_BADGE: Record<string, React.CSSProperties> = {
   veresiye: { backgroundColor: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" },
   nakit: { backgroundColor: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" },
   kredi_karti: { backgroundColor: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" },
+  eft_havale: { backgroundColor: "#f5f3ff", color: "#7c3aed", border: "1px solid #ddd6fe" },
 };
 
 const S = {
@@ -47,7 +48,7 @@ export default function CustomerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [payModal, setPayModal] = useState(false);
   const [payAmount, setPayAmount] = useState("");
-  const [payMethod, setPayMethod] = useState<"nakit" | "kredi_karti">("nakit");
+  const [payMethod, setPayMethod] = useState<"nakit" | "kredi_karti" | "eft_havale">("nakit");
   const [payServiceId, setPayServiceId] = useState("");
   const [paying, setPaying] = useState(false);
 
@@ -363,21 +364,21 @@ export default function CustomerDetailPage() {
                 <label style={{ display: "block", fontSize: 10, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
                   Ödeme Yöntemi
                 </label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => setPayMethod("nakit")}
-                    style={{ flex: 1, padding: "8px 0", borderRadius: 8, fontSize: 13, fontWeight: 600, border: payMethod === "nakit" ? "2px solid #059669" : "1px solid #e2e8f0", backgroundColor: payMethod === "nakit" ? "#f0fdf4" : "#fff", color: payMethod === "nakit" ? "#059669" : "#64748b", cursor: "pointer" }}
-                  >
-                    Nakit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPayMethod("kredi_karti")}
-                    style={{ flex: 1, padding: "8px 0", borderRadius: 8, fontSize: 13, fontWeight: 600, border: payMethod === "kredi_karti" ? "2px solid #2563eb" : "1px solid #e2e8f0", backgroundColor: payMethod === "kredi_karti" ? "#eff6ff" : "#fff", color: payMethod === "kredi_karti" ? "#2563eb" : "#64748b", cursor: "pointer" }}
-                  >
-                    Kredi Kartı
-                  </button>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {([
+                    { key: "nakit",       label: "Nakit",       color: "#059669", bg: "#f0fdf4" },
+                    { key: "kredi_karti", label: "Kredi Kartı", color: "#2563eb", bg: "#eff6ff" },
+                    { key: "eft_havale",  label: "EFT/Havale",  color: "#7c3aed", bg: "#f5f3ff" },
+                  ] as const).map(({ key, label, color, bg }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setPayMethod(key)}
+                      style={{ flex: 1, minWidth: 90, padding: "8px 4px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: payMethod === key ? `2px solid ${color}` : "1px solid #e2e8f0", backgroundColor: payMethod === key ? bg : "#fff", color: payMethod === key ? color : "#64748b", cursor: "pointer" }}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div style={{ marginBottom: 16 }}>
@@ -417,7 +418,7 @@ export default function CustomerDetailPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setPayModal(false); setPayAmount(""); setPayMethod("nakit"); setPayServiceId(""); }}
+                  onClick={() => { setPayModal(false); setPayAmount(""); setPayMethod("nakit" as const); setPayServiceId(""); }}
                   style={{ flex: 1, backgroundColor: "#fff", color: "#475569", padding: "10px 0", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "1px solid #e2e8f0", cursor: "pointer" }}
                 >
                   İptal
