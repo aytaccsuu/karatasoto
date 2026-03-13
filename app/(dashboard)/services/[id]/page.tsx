@@ -81,6 +81,9 @@ export default function ServiceDetailPage() {
   // Ödeme türü düzenleme
   const [editPayType, setEditPayType] = useState(false);
   const [payTypeLoading, setPayTypeLoading] = useState(false);
+  // Kalem inline adet azaltma (sadece azaltmaya izin verilir)
+  const [editingItem, setEditingItem] = useState<{ id: string; origQty: number; quantity: string } | null>(null);
+  const [itemSaveLoading, setItemSaveLoading] = useState(false);
 
   const fetchRecord = useCallback(() => {
     setLoading(true);
@@ -106,6 +109,7 @@ export default function ServiceDetailPage() {
     setEditMode(false);
     setShowAddRow(false);
     setRemoveTarget(null);
+    setEditingItem(null);
     setAddForm({ product_id: "", name: "", quantity: "1", unit_price: "", note: "" });
   }
 
@@ -139,6 +143,28 @@ export default function ServiceDetailPage() {
       toast.error(d.error || "Güncellenemedi");
     }
     setPayTypeLoading(false);
+  }
+
+  async function handleItemSave() {
+    if (!editingItem) return;
+    const qty = parseFloat(editingItem.quantity);
+    if (!qty || qty <= 0 || isNaN(qty)) { toast.error("Geçersiz adet"); return; }
+    if (qty >= editingItem.origQty) { toast.error("Adet mevcut değerden küçük olmalı"); return; }
+    setItemSaveLoading(true);
+    const res = await fetch(`/api/services/${id}/items/${editingItem.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantity: qty }),
+    });
+    if (res.ok) {
+      toast.success("Adet güncellendi");
+      setEditingItem(null);
+      fetchRecord();
+    } else {
+      const d = await res.json();
+      toast.error(d.error || "Güncellenemedi");
+    }
+    setItemSaveLoading(false);
   }
 
   async function handleAddItem() {
@@ -366,21 +392,84 @@ export default function ServiceDetailPage() {
                     </tr>
                   );
                 }
+                const isEditing = editingItem?.id === item.id;
+                const newQtyNum = isEditing ? parseFloat(editingItem.quantity || "0") : item.quantity;
+                const previewTotal = isEditing && !isNaN(newQtyNum)
+                  ? newQtyNum * item.unit_price
+                  : item.line_total;
+                const canSave = isEditing &&
+                  !isNaN(newQtyNum) && newQtyNum > 0 && newQtyNum < item.quantity;
+
                 return (
-                  <tr key={item.id}>
+                  <tr key={item.id} style={{ background: isEditing ? "#f0f4ff" : undefined }}>
                     <td style={S.td}>{item.name}</td>
-                    <td style={S.tdR}>{item.quantity}</td>
-                    <td style={S.tdR}>{formatCurrency(item.unit_price)}</td>
-                    <td style={{ ...S.tdR, fontWeight: 600 }}>{formatCurrency(item.line_total)}</td>
-                    {editMode && (
-                      <td style={{ padding: "10px 0", borderBottom: "1px solid #f8fafc", textAlign: "center" }}>
-                        <button
-                          onClick={() => setRemoveTarget({ id: item.id, name: item.name, note: "" })}
-                          style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 2, display: "flex", alignItems: "center" }}
-                          title="Kalemi sil"
+
+                    {/* Adet — sadece azaltmaya izin verilir */}
+                    <td style={S.tdR}>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          min="0.001"
+                          max={item.quantity - 0.001}
+                          step="0.001"
+                          value={editingItem.quantity}
+                          onChange={(e) =>
+                            setEditingItem((ei) => ei ? { ...ei, quantity: e.target.value } : ei)
+                          }
+                          onKeyDown={(e) => { if (e.key === "Enter" && canSave) handleItemSave(); if (e.key === "Escape") setEditingItem(null); }}
+                          style={{ ...S.input, width: 70, textAlign: "right", fontSize: 12 }}
+                          autoFocus
+                        />
+                      ) : (
+                        <span
+                          onClick={() => {
+                            if (editMode) setEditingItem({ id: item.id, origQty: item.quantity, quantity: String(item.quantity) });
+                          }}
+                          style={{
+                            cursor: editMode ? "pointer" : "default",
+                            textDecoration: editMode ? "underline dotted #a5b4fc" : "none",
+                            color: editMode ? "#4f46e5" : undefined,
+                          }}
+                          title={editMode ? "Adeti azaltmak için tıkla" : undefined}
                         >
-                          <XMarkIcon style={{ width: 15, height: 15 }} />
-                        </button>
+                          {item.quantity}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Birim Fiyat — düzenlenemez */}
+                    <td style={S.tdR}>{formatCurrency(item.unit_price)}</td>
+
+                    {/* Toplam — anlık önizleme */}
+                    <td style={{ ...S.tdR, fontWeight: 600, color: isEditing && canSave ? "#4f46e5" : undefined }}>
+                      {formatCurrency(previewTotal)}
+                    </td>
+
+                    {/* Aksiyon */}
+                    {editMode && (
+                      <td style={{ padding: "6px 0", borderBottom: "1px solid #f8fafc", textAlign: "center" }}>
+                        {isEditing ? (
+                          <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+                            <button
+                              onClick={handleItemSave}
+                              disabled={!canSave || itemSaveLoading}
+                              style={{ fontSize: 10, background: canSave ? "#4f46e5" : "#e2e8f0", color: canSave ? "#fff" : "#94a3b8", border: "none", borderRadius: 4, padding: "3px 8px", cursor: canSave && !itemSaveLoading ? "pointer" : "default", fontWeight: 700 }}>
+                              {itemSaveLoading ? "..." : "Kaydet"}
+                            </button>
+                            <button
+                              onClick={() => setEditingItem(null)}
+                              style={{ fontSize: 10, background: "#f1f5f9", color: "#64748b", border: "none", borderRadius: 4, padding: "3px 6px", cursor: "pointer" }}>
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setRemoveTarget({ id: item.id, name: item.name, note: "" })}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 2, display: "flex", alignItems: "center" }}
+                            title="Kalemi tamamen sil">
+                            <XMarkIcon style={{ width: 15, height: 15 }} />
+                          </button>
+                        )}
                       </td>
                     )}
                   </tr>

@@ -106,10 +106,14 @@ export async function GET(
     ["Plaka / Şasi No:", `${vehicle.plate || ""}${vehicle.chassis_number ? " / " + vehicle.chassis_number : ""}`],
     ["Araç Markası:", vehicle.brand || "-"],
   ];
+  const kmVal = record.km_at_service != null ? Number(record.km_at_service) : null;
+  const payLabel: Record<string, string> = {
+    nakit: "Nakit", kredi_karti: "Kredi Kartı", veresiye: "Veresiye", eft_havale: "EFT/Havale",
+  };
   const infoRows2 = [
     ["Araç Modeli - Yılı:", `${vehicle.model || ""}${vehicle.year ? " - " + vehicle.year : ""}`],
-    ["Kilometre:", record.km_at_service ? record.km_at_service.toLocaleString("tr-TR") + " km" : "-"],
-    ["Ödeme Türü:", record.payment_type === "nakit" ? "Nakit" : record.payment_type === "kredi_karti" ? "Kredi Kartı" : "Veresiye"],
+    ["Kilometre:", kmVal != null && kmVal > 0 ? kmVal.toLocaleString("tr-TR") + " km" : "-"],
+    ["Ödeme Türü:", payLabel[record.payment_type] || record.payment_type || "-"],
     ["", ""],
   ];
 
