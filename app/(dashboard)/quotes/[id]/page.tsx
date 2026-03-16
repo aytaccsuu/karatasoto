@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeftIcon, TrashIcon, DocumentArrowDownIcon } from "@heroicons/react/24/outline";
+import { ChevronLeftIcon, TrashIcon, DocumentArrowDownIcon, PencilSquareIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -13,6 +13,12 @@ interface QuoteLineItem {
   quantity: number;
   unit_price: number;
   line_total: number;
+}
+
+interface EditableItem {
+  name: string;
+  _qty: string;
+  _price: string;
 }
 
 interface Quote {
@@ -74,6 +80,7 @@ const S = {
   summaryRow: { display: "flex", justifyContent: "space-between", fontSize: 13, color: "#475569", marginBottom: 4 } as React.CSSProperties,
   summaryTotal: { display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 700, color: "#0f172a", borderTop: "2px solid #e2e8f0", paddingTop: 10, marginTop: 6 } as React.CSSProperties,
   deleteBtn: { display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#fff", color: "#dc2626", padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1px solid #fecaca", cursor: "pointer" } as React.CSSProperties,
+  inp: { border: "1px solid #d1d5db", borderRadius: 6, padding: "4px 7px", fontSize: 12, outline: "none", background: "#fff", textAlign: "right" as const } as React.CSSProperties,
 };
 
 export default function QuoteDetailPage() {
@@ -85,14 +92,81 @@ export default function QuoteDetailPage() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  // Edit mode
+  const [editMode, setEditMode] = useState(false);
+  const [editItems, setEditItems] = useState<EditableItem[]>([]);
+  const [saveLoading, setSaveLoading] = useState(false);
+
   async function load() {
-    const res = await fetch(`/api/quotes/${id}`);
+    const res = await fetch(`/api/quotes/${id}`, { cache: "no-store" });
     const data = await res.json();
     setQuote(data.data);
     setLoading(false);
   }
 
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function enterEditMode() {
+    if (!quote) return;
+    setEditItems(quote.line_items.map((li) => ({
+      name: li.name,
+      _qty: String(li.quantity),
+      _price: String(li.unit_price),
+    })));
+    setEditMode(true);
+  }
+
+  function exitEditMode() {
+    setEditMode(false);
+    setEditItems([]);
+  }
+
+  // Anlık önizleme
+  const laborNum = quote?.labor_cost || 0;
+  const previewItems = editItems.map((ei) => ({
+    name: ei.name,
+    quantity: parseFloat(ei._qty) || 0,
+    unit_price: parseFloat(ei._price) || 0,
+    line_total: Math.round((parseFloat(ei._qty) || 0) * (parseFloat(ei._price) || 0) * 100) / 100,
+  }));
+  const previewParts = previewItems.reduce((s, li) => s + li.line_total, 0);
+  const previewSubtotal = previewParts + laborNum;
+  const previewKdv = quote?.kdv_enabled ? Math.round(previewSubtotal * 0.20 * 100) / 100 : 0;
+  const previewGrand = Math.round((previewSubtotal + previewKdv) * 100) / 100;
+
+  const isDirty = editItems.some((ei, i) => {
+    const orig = quote?.line_items[i];
+    return !orig || ei._qty !== String(orig.quantity) || ei._price !== String(orig.unit_price);
+  });
+
+  async function handleSaveItems() {
+    for (const ei of editItems) {
+      const q = parseFloat(ei._qty);
+      const p = parseFloat(ei._price);
+      if (!q || q <= 0) { toast.error("Tüm adetler 0'dan büyük olmalı"); return; }
+      if (isNaN(p) || p < 0) { toast.error("Birim fiyat geçersiz"); return; }
+    }
+    setSaveLoading(true);
+    const items = editItems.map((ei) => ({
+      name: ei.name,
+      quantity: parseFloat(ei._qty),
+      unit_price: parseFloat(ei._price),
+    }));
+    const res = await fetch(`/api/quotes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ line_items: items }),
+    });
+    if (res.ok) {
+      toast.success("Kalemler güncellendi");
+      setEditMode(false);
+      load();
+    } else {
+      const d = await res.json();
+      toast.error(d.error || "Kaydedilemedi");
+    }
+    setSaveLoading(false);
+  }
 
   async function updateStatus(status: string) {
     setUpdatingStatus(true);
@@ -101,12 +175,8 @@ export default function QuoteDetailPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
-    if (res.ok) {
-      toast.success("Durum güncellendi");
-      load();
-    } else {
-      toast.error("Güncelleme başarısız");
-    }
+    if (res.ok) { toast.success("Durum güncellendi"); load(); }
+    else toast.error("Güncelleme başarısız");
     setUpdatingStatus(false);
   }
 
@@ -122,21 +192,15 @@ export default function QuoteDetailPage() {
       a.download = `teklif_${quote?.quote_number ?? id.slice(0, 8)}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      toast.error("PDF indirme başarısız");
-    }
+    } catch { toast.error("PDF indirme başarısız"); }
     setPdfLoading(false);
   }
 
   async function executeDelete() {
     const res = await fetch(`/api/quotes/${id}`, { method: "DELETE" });
     setConfirmOpen(false);
-    if (res.ok) {
-      toast.success("Teklif silindi");
-      router.push("/quotes");
-    } else {
-      toast.error("Silinemedi");
-    }
+    if (res.ok) { toast.success("Teklif silindi"); router.push("/quotes"); }
+    else toast.error("Silinemedi");
   }
 
   if (loading) return (
@@ -146,15 +210,16 @@ export default function QuoteDetailPage() {
     </div>
   );
 
-
   if (!quote) return <p style={{ color: "#64748b", fontSize: 13 }}>Teklif bulunamadı.</p>;
 
-  const partsTotal = (quote.line_items || []).reduce((s, li) => s + li.line_total, 0);
+  const displayItems = editMode ? previewItems : quote.line_items;
+  const displayParts = editMode ? previewParts : (quote.line_items || []).reduce((s, li) => s + li.line_total, 0);
+  const displayKdv = editMode ? previewKdv : quote.kdv_amount;
+  const displayGrand = editMode ? previewGrand : quote.grand_total;
 
   return (
     <div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-
       <ConfirmModal
         open={confirmOpen}
         title="Teklifi Sil"
@@ -174,11 +239,8 @@ export default function QuoteDetailPage() {
             <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, ...(STATUS_STYLE[quote.status] ?? {}) }}>
               {STATUS_LABELS[quote.status] ?? quote.status}
             </span>
-            <button
-              onClick={downloadPdf}
-              disabled={pdfLoading}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: pdfLoading ? "not-allowed" : "pointer", opacity: pdfLoading ? 0.6 : 1 }}
-            >
+            <button onClick={downloadPdf} disabled={pdfLoading}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: pdfLoading ? "not-allowed" : "pointer", opacity: pdfLoading ? 0.6 : 1 }}>
               <DocumentArrowDownIcon style={{ width: 14, height: 14 }} />
               {pdfLoading ? "..." : "PDF İndir"}
             </button>
@@ -189,17 +251,13 @@ export default function QuoteDetailPage() {
         </div>
       </div>
 
-      {/* Durum Güncelle */}
+      {/* Durum */}
       <div style={S.card}>
         <div style={S.cardHeader}><p style={S.cardTitle}>Durum</p></div>
         <div style={{ ...S.cardBody, display: "flex", gap: 8, flexWrap: "wrap" }}>
           {STATUS_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              disabled={updatingStatus || quote.status === opt.value}
-              onClick={() => updateStatus(opt.value)}
-              style={{ padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: quote.status === opt.value ? `2px solid ${opt.value === "onaylandi" ? "#16a34a" : opt.value === "reddedildi" ? "#dc2626" : opt.value === "gonderildi" ? "#2563eb" : "#64748b"}` : "1px solid #e2e8f0", backgroundColor: quote.status === opt.value ? (STATUS_STYLE[opt.value]?.backgroundColor ?? "#fff") : "#fff", color: quote.status === opt.value ? (STATUS_STYLE[opt.value]?.color ?? "#475569") : "#64748b", cursor: quote.status === opt.value ? "default" : "pointer", opacity: updatingStatus ? 0.6 : 1 }}
-            >
+            <button key={opt.value} disabled={updatingStatus || quote.status === opt.value} onClick={() => updateStatus(opt.value)}
+              style={{ padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: quote.status === opt.value ? `2px solid ${opt.value === "onaylandi" ? "#16a34a" : opt.value === "reddedildi" ? "#dc2626" : opt.value === "gonderildi" ? "#2563eb" : "#64748b"}` : "1px solid #e2e8f0", backgroundColor: quote.status === opt.value ? (STATUS_STYLE[opt.value]?.backgroundColor ?? "#fff") : "#fff", color: quote.status === opt.value ? (STATUS_STYLE[opt.value]?.color ?? "#475569") : "#64748b", cursor: quote.status === opt.value ? "default" : "pointer", opacity: updatingStatus ? 0.6 : 1 }}>
               {opt.label}
             </button>
           ))}
@@ -215,47 +273,93 @@ export default function QuoteDetailPage() {
             <p style={S.infoValue}>
               {quote.customer_id
                 ? <Link href={`/customers/${quote.customer_id}`} style={{ color: "#4f46e5", textDecoration: "none" }}>{quote.customer_name}</Link>
-                : quote.customer_name || "—"
-              }
+                : quote.customer_name || "—"}
             </p>
           </div>
-          <div>
-            <p style={S.infoLabel}>Araç</p>
-            <p style={S.infoValue}>{quote.vehicle_info || "—"}</p>
-          </div>
-          <div>
-            <p style={S.infoLabel}>Teklif Tarihi</p>
-            <p style={S.infoValue}>{formatDate(quote.quote_date)}</p>
-          </div>
-          <div>
-            <p style={S.infoLabel}>Geçerlilik</p>
-            <p style={S.infoValue}>{quote.valid_until ? formatDate(quote.valid_until) : "—"}</p>
-          </div>
+          <div><p style={S.infoLabel}>Araç</p><p style={S.infoValue}>{quote.vehicle_info || "—"}</p></div>
+          <div><p style={S.infoLabel}>Teklif Tarihi</p><p style={S.infoValue}>{formatDate(quote.quote_date)}</p></div>
+          <div><p style={S.infoLabel}>Geçerlilik</p><p style={S.infoValue}>{quote.valid_until ? formatDate(quote.valid_until) : "—"}</p></div>
         </div>
       </div>
 
       {/* Kalemler */}
       <div style={S.card}>
-        <div style={S.cardHeader}><p style={S.cardTitle}>Teklif Kalemleri</p></div>
+        <div style={S.cardHeader}>
+          <p style={S.cardTitle}>Teklif Kalemleri</p>
+          {!editMode ? (
+            <button onClick={enterEditMode}
+              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#4f46e5", background: "#eef2ff", border: "none", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 600 }}>
+              <PencilSquareIcon style={{ width: 14, height: 14 }} />
+              Düzenle
+            </button>
+          ) : (
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <span style={{ fontSize: 11, color: "#64748b" }}>Adet ve fiyatı düzenleyebilirsiniz</span>
+              <button onClick={handleSaveItems} disabled={!isDirty || saveLoading}
+                style={{ fontSize: 12, background: isDirty ? "#4f46e5" : "#e2e8f0", color: isDirty ? "#fff" : "#94a3b8", border: "none", borderRadius: 6, padding: "5px 14px", cursor: isDirty && !saveLoading ? "pointer" : "default", fontWeight: 600 }}>
+                {saveLoading ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+              <button onClick={exitEditMode}
+                style={{ display: "flex", alignItems: "center", fontSize: 12, color: "#64748b", background: "#f1f5f9", border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer" }}>
+                <XMarkIcon style={{ width: 14, height: 14 }} />
+              </button>
+            </div>
+          )}
+        </div>
+
         <div style={{ overflowX: "auto" }}>
           <table style={S.table}>
             <thead>
               <tr>
                 <th style={S.th}>Ürün / Hizmet</th>
-                <th style={{ ...S.thR, width: 60 }}>Adet</th>
-                <th style={{ ...S.thR, width: 120 }}>Birim Fiyat</th>
+                <th style={{ ...S.thR, width: editMode ? 90 : 60 }}>Adet</th>
+                <th style={{ ...S.thR, width: editMode ? 130 : 120 }}>Birim Fiyat</th>
                 <th style={{ ...S.thR, width: 120 }}>Toplam</th>
               </tr>
             </thead>
             <tbody>
-              {(quote.line_items || []).map((li, i) => (
-                <tr key={i}>
-                  <td style={S.td}>{li.name}</td>
-                  <td style={{ ...S.tdR, color: "#64748b" }}>{li.quantity}</td>
-                  <td style={S.tdR}>{formatCurrency(li.unit_price)}</td>
-                  <td style={{ ...S.tdR, fontWeight: 700 }}>{formatCurrency(li.line_total)}</td>
-                </tr>
-              ))}
+              {displayItems.map((li, i) => {
+                if (!editMode) {
+                  return (
+                    <tr key={i}>
+                      <td style={S.td}>{li.name}</td>
+                      <td style={{ ...S.tdR, color: "#64748b" }}>{li.quantity}</td>
+                      <td style={S.tdR}>{formatCurrency(li.unit_price)}</td>
+                      <td style={{ ...S.tdR, fontWeight: 700 }}>{formatCurrency(li.line_total)}</td>
+                    </tr>
+                  );
+                }
+                const ei = editItems[i];
+                const origTotal = quote.line_items[i]?.line_total ?? 0;
+                const prevTotal = Math.round((parseFloat(ei._qty) || 0) * (parseFloat(ei._price) || 0) * 100) / 100;
+                const changed = Math.abs(prevTotal - origTotal) > 0.001;
+                return (
+                  <tr key={i} style={{ background: changed ? "#f0f4ff" : undefined }}>
+                    <td style={S.td}>{li.name}</td>
+                    <td style={{ ...S.tdR, padding: "7px 12px" }}>
+                      <input
+                        type="number" min="0.001" step="0.001"
+                        value={ei._qty}
+                        onChange={(e) => setEditItems((prev) => prev.map((x, j) => j === i ? { ...x, _qty: e.target.value } : x))}
+                        onKeyDown={(e) => { if (e.key === "Enter" && isDirty) handleSaveItems(); if (e.key === "Escape") exitEditMode(); }}
+                        style={{ ...S.inp, width: 70 }}
+                      />
+                    </td>
+                    <td style={{ ...S.tdR, padding: "7px 12px" }}>
+                      <input
+                        type="number" min="0" step="0.01"
+                        value={ei._price}
+                        onChange={(e) => setEditItems((prev) => prev.map((x, j) => j === i ? { ...x, _price: e.target.value } : x))}
+                        onKeyDown={(e) => { if (e.key === "Enter" && isDirty) handleSaveItems(); if (e.key === "Escape") exitEditMode(); }}
+                        style={{ ...S.inp, width: 90 }}
+                      />
+                    </td>
+                    <td style={{ ...S.tdR, fontWeight: 700, color: changed ? "#4f46e5" : undefined }}>
+                      {formatCurrency(prevTotal)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -263,12 +367,20 @@ export default function QuoteDetailPage() {
 
       {/* Özet */}
       <div style={S.card}>
-        <div style={S.cardHeader}><p style={S.cardTitle}>Fiyat Özeti</p></div>
+        <div style={S.cardHeader}>
+          <p style={S.cardTitle}>
+            Fiyat Özeti
+            {editMode && isDirty && <span style={{ color: "#4f46e5", fontSize: 10, fontWeight: 400, marginLeft: 8 }}>önizleme</span>}
+          </p>
+        </div>
         <div style={{ ...S.cardBody, maxWidth: 320, marginLeft: "auto" }}>
-          <div style={S.summaryRow}><span>Parça / Malzeme:</span><span>{formatCurrency(partsTotal)}</span></div>
-          {quote.labor_cost > 0 && <div style={S.summaryRow}><span>İşçilik:</span><span>{formatCurrency(quote.labor_cost)}</span></div>}
-          {quote.kdv_enabled && <div style={{ ...S.summaryRow, color: "#b45309" }}><span>KDV (%20):</span><span>+{formatCurrency(quote.kdv_amount)}</span></div>}
-          <div style={S.summaryTotal}><span>GENEL TOPLAM:</span><span style={{ color: "#4f46e5" }}>{formatCurrency(quote.grand_total)}</span></div>
+          <div style={S.summaryRow}><span>Parça / Malzeme:</span><span>{formatCurrency(displayParts)}</span></div>
+          {laborNum > 0 && <div style={S.summaryRow}><span>İşçilik:</span><span>{formatCurrency(laborNum)}</span></div>}
+          {quote.kdv_enabled && <div style={{ ...S.summaryRow, color: "#b45309" }}><span>KDV (%20):</span><span>+{formatCurrency(displayKdv)}</span></div>}
+          <div style={{ ...S.summaryTotal }}>
+            <span>GENEL TOPLAM:</span>
+            <span style={{ color: "#4f46e5" }}>{formatCurrency(displayGrand)}</span>
+          </div>
         </div>
       </div>
 
