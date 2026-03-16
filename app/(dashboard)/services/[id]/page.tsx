@@ -84,6 +84,10 @@ export default function ServiceDetailPage() {
   // Kalem inline adet azaltma (sadece azaltmaya izin verilir)
   const [editingItem, setEditingItem] = useState<{ id: string; origQty: number; quantity: string } | null>(null);
   const [itemSaveLoading, setItemSaveLoading] = useState(false);
+  // İşçilik düzenleme
+  const [editLabor, setEditLabor] = useState(false);
+  const [laborInput, setLaborInput] = useState("");
+  const [laborLoading, setLaborLoading] = useState(false);
 
   const fetchRecord = useCallback(() => {
     setLoading(true);
@@ -207,6 +211,26 @@ export default function ServiceDetailPage() {
       toast.error(d.error || "Silinemedi");
     }
     setRemoveLoading(false);
+  }
+
+  async function handleLaborSave() {
+    const val = parseFloat(laborInput);
+    if (isNaN(val) || val < 0) { toast.error("Geçersiz işçilik ücreti"); return; }
+    setLaborLoading(true);
+    const res = await fetch(`/api/services/${id}/labor`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ labor_cost: val }),
+    });
+    if (res.ok) {
+      toast.success("İşçilik güncellendi");
+      setEditLabor(false);
+      fetchRecord();
+    } else {
+      const d = await res.json();
+      toast.error(d.error || "Güncellenemedi");
+    }
+    setLaborLoading(false);
   }
 
   async function handleDelete() {
@@ -558,12 +582,44 @@ export default function ServiceDetailPage() {
                 <span>Parça Toplamı:</span>
                 <span>{formatCurrency(record.parts_total)}</span>
               </div>
-              {record.labor_cost > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#64748b" }}>
-                  <span>İşçilik:</span>
-                  <span>{formatCurrency(record.labor_cost)}</span>
-                </div>
-              )}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, color: "#64748b" }}>
+                <span>İşçilik:</span>
+                {!editLabor ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>{record.labor_cost > 0 ? formatCurrency(record.labor_cost) : "—"}</span>
+                    <button
+                      onClick={() => { setLaborInput(record.labor_cost > 0 ? String(record.labor_cost) : ""); setEditLabor(true); }}
+                      style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#4f46e5", background: "#eef2ff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer", fontWeight: 600 }}>
+                      <PencilSquareIcon style={{ width: 11, height: 11 }} />
+                      {record.labor_cost > 0 ? "Düzenle" : "Ekle"}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <input
+                      autoFocus
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={laborInput}
+                      onChange={(e) => setLaborInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleLaborSave(); if (e.key === "Escape") setEditLabor(false); }}
+                      style={{ ...S.input, width: 90, textAlign: "right" }}
+                    />
+                    <button
+                      onClick={handleLaborSave}
+                      disabled={laborLoading}
+                      style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: "#4f46e5", border: "none", borderRadius: 4, padding: "3px 8px", cursor: "pointer" }}>
+                      {laborLoading ? "..." : "Kaydet"}
+                    </button>
+                    <button
+                      onClick={() => setEditLabor(false)}
+                      style={{ fontSize: 10, color: "#64748b", background: "#f1f5f9", border: "none", borderRadius: 4, padding: "3px 6px", cursor: "pointer" }}>
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
               {rec.kdv_enabled && (
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#b45309" }}>
                   <span>KDV (%20):</span>

@@ -79,6 +79,33 @@ export async function PATCH(
     return NextResponse.json({ data });
   }
 
+  // --- İşçilik güncelleme ---
+  if (body.labor_cost !== undefined) {
+    const newLabor = parseFloat(body.labor_cost);
+    if (isNaN(newLabor) || newLabor < 0) {
+      return NextResponse.json({ error: "Geçersiz işçilik ücreti" }, { status: 400 });
+    }
+    const { data: current, error: fetchErr } = await supabase
+      .from("quotes")
+      .select("parts_total, kdv_enabled")
+      .eq("id", id)
+      .single();
+    if (fetchErr || !current) {
+      return NextResponse.json({ error: "Teklif bulunamadı" }, { status: 404 });
+    }
+    const subtotal = (current.parts_total || 0) + newLabor;
+    const kdvAmount = current.kdv_enabled ? Math.round(subtotal * 0.20 * 100) / 100 : 0;
+    const grandTotal = Math.round((subtotal + kdvAmount) * 100) / 100;
+    const { data, error } = await supabase
+      .from("quotes")
+      .update({ labor_cost: newLabor, kdv_amount: kdvAmount, grand_total: grandTotal, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ data });
+  }
+
   return NextResponse.json({ error: "Güncellenecek alan belirtilmedi" }, { status: 400 });
 }
 

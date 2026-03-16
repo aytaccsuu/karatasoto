@@ -96,6 +96,10 @@ export default function QuoteDetailPage() {
   const [editMode, setEditMode] = useState(false);
   const [editItems, setEditItems] = useState<EditableItem[]>([]);
   const [saveLoading, setSaveLoading] = useState(false);
+  // İşçilik düzenleme
+  const [editLabor, setEditLabor] = useState(false);
+  const [laborInput, setLaborInput] = useState("");
+  const [laborLoading, setLaborLoading] = useState(false);
 
   async function load() {
     const res = await fetch(`/api/quotes/${id}`, { cache: "no-store" });
@@ -119,6 +123,26 @@ export default function QuoteDetailPage() {
   function exitEditMode() {
     setEditMode(false);
     setEditItems([]);
+  }
+
+  async function handleLaborSave() {
+    const val = parseFloat(laborInput);
+    if (isNaN(val) || val < 0) { toast.error("Geçersiz işçilik ücreti"); return; }
+    setLaborLoading(true);
+    const res = await fetch(`/api/quotes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ labor_cost: val }),
+    });
+    if (res.ok) {
+      toast.success("İşçilik güncellendi");
+      setEditLabor(false);
+      load();
+    } else {
+      const d = await res.json();
+      toast.error(d.error || "Güncellenemedi");
+    }
+    setLaborLoading(false);
   }
 
   // Anlık önizleme
@@ -375,7 +399,44 @@ export default function QuoteDetailPage() {
         </div>
         <div style={{ ...S.cardBody, maxWidth: 320, marginLeft: "auto" }}>
           <div style={S.summaryRow}><span>Parça / Malzeme:</span><span>{formatCurrency(displayParts)}</span></div>
-          {laborNum > 0 && <div style={S.summaryRow}><span>İşçilik:</span><span>{formatCurrency(laborNum)}</span></div>}
+          <div style={{ ...S.summaryRow, alignItems: "center" }}>
+            <span>İşçilik:</span>
+            {!editLabor ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span>{laborNum > 0 ? formatCurrency(laborNum) : "—"}</span>
+                <button
+                  onClick={() => { setLaborInput(laborNum > 0 ? String(laborNum) : ""); setEditLabor(true); }}
+                  style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#4f46e5", background: "#eef2ff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer", fontWeight: 600 }}>
+                  <PencilSquareIcon style={{ width: 11, height: 11 }} />
+                  {laborNum > 0 ? "Düzenle" : "Ekle"}
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <input
+                  autoFocus
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={laborInput}
+                  onChange={(e) => setLaborInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleLaborSave(); if (e.key === "Escape") setEditLabor(false); }}
+                  style={{ ...S.inp, width: 90 }}
+                />
+                <button
+                  onClick={handleLaborSave}
+                  disabled={laborLoading}
+                  style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: "#4f46e5", border: "none", borderRadius: 4, padding: "3px 8px", cursor: "pointer" }}>
+                  {laborLoading ? "..." : "Kaydet"}
+                </button>
+                <button
+                  onClick={() => setEditLabor(false)}
+                  style={{ fontSize: 10, color: "#64748b", background: "#f1f5f9", border: "none", borderRadius: 4, padding: "3px 6px", cursor: "pointer" }}>
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
           {quote.kdv_enabled && <div style={{ ...S.summaryRow, color: "#b45309" }}><span>KDV (%20):</span><span>+{formatCurrency(displayKdv)}</span></div>}
           <div style={{ ...S.summaryTotal }}>
             <span>GENEL TOPLAM:</span>
