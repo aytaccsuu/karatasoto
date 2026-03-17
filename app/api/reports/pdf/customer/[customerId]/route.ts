@@ -15,7 +15,7 @@ export async function GET(
   // Müşteri bilgisi + borç hareketleri
   const { data: customer, error: custErr } = await supabase
     .from("customers")
-    .select("*, debt_transactions(*)")
+    .select("*")
     .eq("id", customerId)
     .single();
 
@@ -176,50 +176,6 @@ export async function GET(
       }
     },
   });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const finalY = (doc as any).lastAutoTable?.finalY ?? y + 10;
-
-  // Borç hareketleri (varsa)
-  const txns = customer.debt_transactions ?? [];
-  if (txns.length > 0) {
-    let ty = finalY + 8;
-    doc.setFont(F, "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(30, 41, 59);
-    doc.text("BORÇ HAREKETLERİ", 14, ty);
-    ty += 4;
-
-    const txnRows = txns.map((t: { created_at: string; description?: string; amount: number; balance_after: number }) => {
-      const d = new Date(t.created_at).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
-      const desc = t.description || "—";
-      const amt = `${t.amount > 0 ? "+" : ""}${t.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺`;
-      const bal = `${t.balance_after.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺`;
-      return [d, desc, amt, bal];
-    });
-
-    autoTable(doc, {
-      startY: ty,
-      head: [["Tarih", "Açıklama", "Tutar", "Bakiye"]],
-      body: txnRows,
-      margin: { left: 14, right: 14 },
-      styles: { font: F, fontSize: 8, cellPadding: 2.5, textColor: [51, 65, 85] },
-      headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontStyle: "bold", fontSize: 7.5 },
-      columnStyles: {
-        0: { cellWidth: 26 },
-        2: { halign: "right", cellWidth: 32 },
-        3: { halign: "right", cellWidth: 32 },
-      },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      didParseCell: (data) => {
-        if (data.section === "body" && data.column.index === 2) {
-          const raw = data.cell.raw as string;
-          data.cell.styles.textColor = raw.startsWith("+") ? [220, 38, 38] : [22, 163, 74];
-          data.cell.styles.fontStyle = "bold";
-        }
-      },
-    });
-  }
 
   // Alt satır
   const pageH = doc.internal.pageSize.getHeight();

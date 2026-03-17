@@ -90,6 +90,8 @@ export default function QuoteDetailPage() {
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfPreviewFilename, setPdfPreviewFilename] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   // Edit mode
@@ -211,13 +213,23 @@ export default function QuoteDetailPage() {
       if (!res.ok) throw new Error();
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `teklif_${quote?.quote_number ?? id.slice(0, 8)}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch { toast.error("PDF indirme başarısız"); }
+      setPdfPreviewFilename(`teklif_${quote?.quote_number ?? id.slice(0, 8)}.pdf`);
+      setPdfPreviewUrl(url);
+    } catch { toast.error("PDF yüklenemedi"); }
     setPdfLoading(false);
+  }
+
+  function handlePdfDownload() {
+    if (!pdfPreviewUrl) return;
+    const a = document.createElement("a");
+    a.href = pdfPreviewUrl;
+    a.download = pdfPreviewFilename;
+    a.click();
+  }
+
+  function closePdfPreview() {
+    if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+    setPdfPreviewUrl(null);
   }
 
   async function executeDelete() {
@@ -244,6 +256,27 @@ export default function QuoteDetailPage() {
   return (
     <div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* PDF Önizleme Modal */}
+      {pdfPreviewUrl && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ backgroundColor: "#fff", borderRadius: 12, width: "100%", maxWidth: 860, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid #e2e8f0" }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#1e293b" }}>PDF Önizleme</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={handlePdfDownload} style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+                  <DocumentArrowDownIcon style={{ width: 15, height: 15 }} /> İndir
+                </button>
+                <button onClick={closePdfPreview} style={{ display: "inline-flex", alignItems: "center", gap: 4, backgroundColor: "#f1f5f9", color: "#475569", padding: "7px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+                  <XMarkIcon style={{ width: 15, height: 15 }} /> Kapat
+                </button>
+              </div>
+            </div>
+            <iframe src={pdfPreviewUrl} style={{ flex: 1, border: "none", minHeight: 500 }} title="PDF Önizleme" />
+          </div>
+        </div>
+      )}
+
       <ConfirmModal
         open={confirmOpen}
         title="Teklifi Sil"
