@@ -177,7 +177,11 @@ export default function CustomersPage() {
                           <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, backgroundColor: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
                             {formatCurrency(c.total_debt)}
                           </span>
-                        ) : <span style={{ color: "#cbd5e1", fontSize: 12 }}>—</span>}
+                        ) : (
+                          <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600, backgroundColor: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>
+                            Borcu Yok
+                          </span>
+                        )}
                       </td>
                       <td style={S.td}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
@@ -205,8 +209,10 @@ export default function CustomersPage() {
                     </div>
                   </Link>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    {c.total_debt > 0 && (
+                    {c.total_debt > 0 ? (
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#dc2626", marginBottom: 6 }}>{formatCurrency(c.total_debt)}</div>
+                    ) : (
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "#16a34a", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, padding: "2px 7px", marginBottom: 6, display: "inline-block" }}>Borcu Yok</div>
                     )}
                     <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                       <button onClick={() => router.push(`/customers/${c.id}/edit`)} style={{ fontSize: 12, fontWeight: 600, color: "#4f46e5", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Düzenle</button>

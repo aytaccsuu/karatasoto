@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeftIcon, PlusIcon, TruckIcon, WrenchScrewdriverIcon,
-  BanknotesIcon, PencilIcon, XMarkIcon,
+  BanknotesIcon, PencilIcon, XMarkIcon, DocumentArrowDownIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatCurrency, formatDate, PAYMENT_TYPE_LABELS } from "@/lib/utils";
@@ -157,6 +157,15 @@ export default function CustomerDetailPage() {
                 Ödeme Al
               </button>
             )}
+            <a
+              href={`/api/reports/pdf/customer/${id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#fff", color: "#7c3aed", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "1px solid #ddd6fe", cursor: "pointer", textDecoration: "none" }}
+            >
+              <DocumentArrowDownIcon style={{ width: 15, height: 15 }} />
+              PDF İndir
+            </a>
             <button
               onClick={() => router.push(`/customers/${id}/edit`)}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#fff", color: "#475569", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "1px solid #e2e8f0", cursor: "pointer" }}
