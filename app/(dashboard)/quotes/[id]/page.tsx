@@ -89,9 +89,7 @@ export default function QuoteDetailPage() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
-  const [pdfPreviewFilename, setPdfPreviewFilename] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   // Edit mode
@@ -206,29 +204,11 @@ export default function QuoteDetailPage() {
     setUpdatingStatus(false);
   }
 
-  async function downloadPdf() {
-    setPdfLoading(true);
-    try {
-      const res = await fetch(`/api/reports/pdf/quote/${id}`);
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setPdfPreviewFilename(`teklif_${quote?.quote_number ?? id.slice(0, 8)}.pdf`);
-      setPdfPreviewUrl(url);
-    } catch { toast.error("PDF yüklenemedi"); }
-    setPdfLoading(false);
-  }
-
-  function handlePdfDownload() {
-    if (!pdfPreviewUrl) return;
-    const a = document.createElement("a");
-    a.href = pdfPreviewUrl;
-    a.download = pdfPreviewFilename;
-    a.click();
+  function downloadPdf() {
+    setPdfPreviewUrl(`/api/reports/pdf/quote/${id}`);
   }
 
   function closePdfPreview() {
-    if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
     setPdfPreviewUrl(null);
   }
 
@@ -264,15 +244,15 @@ export default function QuoteDetailPage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid #e2e8f0" }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: "#1e293b" }}>PDF Önizleme</span>
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={handlePdfDownload} style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+                <a href={pdfPreviewUrl ?? ""} download={`teklif_${quote?.quote_number ?? id.slice(0,8)}.pdf`} style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", textDecoration: "none" }}>
                   <DocumentArrowDownIcon style={{ width: 15, height: 15 }} /> İndir
-                </button>
+                </a>
                 <button onClick={closePdfPreview} style={{ display: "inline-flex", alignItems: "center", gap: 4, backgroundColor: "#f1f5f9", color: "#475569", padding: "7px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
                   <XMarkIcon style={{ width: 15, height: 15 }} /> Kapat
                 </button>
               </div>
             </div>
-            <iframe src={pdfPreviewUrl} style={{ flex: 1, border: "none", minHeight: 500 }} title="PDF Önizleme" />
+            <object data={pdfPreviewUrl} type="application/pdf" style={{ flex: 1, border: "none", minHeight: 500, width: "100%" }}><p style={{ padding: 16, color: "#64748b" }}>PDF görüntülenemiyor. <a href={pdfPreviewUrl ?? ""} target="_blank" style={{ color: "#4f46e5" }}>Yeni sekmede aç</a></p></object>
           </div>
         </div>
       )}
@@ -296,10 +276,10 @@ export default function QuoteDetailPage() {
             <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, ...(STATUS_STYLE[quote.status] ?? {}) }}>
               {STATUS_LABELS[quote.status] ?? quote.status}
             </span>
-            <button onClick={downloadPdf} disabled={pdfLoading}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: pdfLoading ? "not-allowed" : "pointer", opacity: pdfLoading ? 0.6 : 1 }}>
+            <button onClick={downloadPdf}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}>
               <DocumentArrowDownIcon style={{ width: 14, height: 14 }} />
-              {pdfLoading ? "..." : "PDF İndir"}
+              PDF İndir
             </button>
             <button onClick={() => setConfirmOpen(true)} style={S.deleteBtn}>
               <TrashIcon style={{ width: 14, height: 14 }} /> Sil

@@ -51,9 +51,7 @@ export default function CustomerDetailPage() {
   const [payMethod, setPayMethod] = useState<"nakit" | "kredi_karti" | "eft_havale">("nakit");
   const [payServiceId, setPayServiceId] = useState("");
   const [paying, setPaying] = useState(false);
-  const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
-  const [pdfPreviewFilename, setPdfPreviewFilename] = useState("");
 
   async function load() {
     const [custRes, svcRes] = await Promise.all([
@@ -69,29 +67,11 @@ export default function CustomerDetailPage() {
 
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function openPdfPreview() {
-    setPdfLoading(true);
-    try {
-      const res = await fetch(`/api/reports/pdf/customer/${id}`);
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setPdfPreviewFilename(`musteri_${id.slice(0, 8)}.pdf`);
-      setPdfPreviewUrl(url);
-    } catch { toast.error("PDF yüklenemedi"); }
-    setPdfLoading(false);
-  }
-
-  function handlePdfDownload() {
-    if (!pdfPreviewUrl) return;
-    const a = document.createElement("a");
-    a.href = pdfPreviewUrl;
-    a.download = pdfPreviewFilename;
-    a.click();
+  function openPdfPreview() {
+    setPdfPreviewUrl(`/api/reports/pdf/customer/${id}`);
   }
 
   function closePdfPreview() {
-    if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
     setPdfPreviewUrl(null);
   }
 
@@ -150,15 +130,15 @@ export default function CustomerDetailPage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid #e2e8f0" }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: "#1e293b" }}>PDF Önizleme</span>
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={handlePdfDownload} style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+                <a href={pdfPreviewUrl} download={`musteri_${id.slice(0,8)}.pdf`} style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", textDecoration: "none" }}>
                   <DocumentArrowDownIcon style={{ width: 15, height: 15 }} /> İndir
-                </button>
+                </a>
                 <button onClick={closePdfPreview} style={{ display: "inline-flex", alignItems: "center", gap: 4, backgroundColor: "#f1f5f9", color: "#475569", padding: "7px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
                   <XMarkIcon style={{ width: 15, height: 15 }} /> Kapat
                 </button>
               </div>
             </div>
-            <iframe src={pdfPreviewUrl} style={{ flex: 1, border: "none", minHeight: 500 }} title="PDF Önizleme" />
+            <object data={pdfPreviewUrl} type="application/pdf" style={{ flex: 1, border: "none", minHeight: 500, width: "100%" }}><p style={{ padding: 16, color: "#64748b" }}>PDF görüntülenemiyor. <a href={pdfPreviewUrl ?? ""} target="_blank" style={{ color: "#4f46e5" }}>Yeni sekmede aç</a></p></object>
           </div>
         </div>
       )}
@@ -208,11 +188,10 @@ export default function CustomerDetailPage() {
             )}
             <button
               onClick={openPdfPreview}
-              disabled={pdfLoading}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#fff", color: "#7c3aed", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "1px solid #ddd6fe", cursor: pdfLoading ? "not-allowed" : "pointer", opacity: pdfLoading ? 0.6 : 1 }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#fff", color: "#7c3aed", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "1px solid #ddd6fe", cursor: "pointer" }}
             >
               <DocumentArrowDownIcon style={{ width: 15, height: 15 }} />
-              {pdfLoading ? "..." : "PDF İndir"}
+              PDF İndir
             </button>
             <button
               onClick={() => router.push(`/customers/${id}/edit`)}

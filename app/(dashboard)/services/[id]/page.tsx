@@ -68,9 +68,7 @@ export default function ServiceDetailPage() {
   const router = useRouter();
   const [record, setRecord] = useState<ServiceRecordFull | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
-  const [pdfPreviewFilename, setPdfPreviewFilename] = useState("");
 
   // Edit mode state
   const [editMode, setEditMode] = useState(false);
@@ -246,31 +244,11 @@ export default function ServiceDetailPage() {
     }
   }
 
-  async function downloadPdf() {
-    setPdfLoading(true);
-    try {
-      const res = await fetch(`/api/reports/pdf/${id}`);
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setPdfPreviewFilename(`servis_${id.slice(0, 8)}.pdf`);
-      setPdfPreviewUrl(url);
-    } catch {
-      toast.error("PDF yüklenemedi");
-    }
-    setPdfLoading(false);
-  }
-
-  function handlePdfDownload() {
-    if (!pdfPreviewUrl) return;
-    const a = document.createElement("a");
-    a.href = pdfPreviewUrl;
-    a.download = pdfPreviewFilename;
-    a.click();
+  function downloadPdf() {
+    setPdfPreviewUrl(`/api/reports/pdf/${id}`);
   }
 
   function closePdfPreview() {
-    if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
     setPdfPreviewUrl(null);
   }
 
@@ -326,15 +304,15 @@ export default function ServiceDetailPage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid #e2e8f0" }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: "#1e293b" }}>PDF Önizleme</span>
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={handlePdfDownload} style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
+                <a href={pdfPreviewUrl ?? ""} download={`servis_${id.slice(0,8)}.pdf`} style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", textDecoration: "none" }}>
                   <DocumentArrowDownIcon style={{ width: 15, height: 15 }} /> İndir
-                </button>
+                </a>
                 <button onClick={closePdfPreview} style={{ display: "inline-flex", alignItems: "center", gap: 4, backgroundColor: "#f1f5f9", color: "#475569", padding: "7px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
                   <XMarkIcon style={{ width: 15, height: 15 }} /> Kapat
                 </button>
               </div>
             </div>
-            <iframe src={pdfPreviewUrl} style={{ flex: 1, border: "none", minHeight: 500 }} title="PDF Önizleme" />
+            <object data={pdfPreviewUrl} type="application/pdf" style={{ flex: 1, border: "none", minHeight: 500, width: "100%" }}><p style={{ padding: 16, color: "#64748b" }}>PDF görüntülenemiyor. <a href={pdfPreviewUrl ?? ""} target="_blank" style={{ color: "#4f46e5" }}>Yeni sekmede aç</a></p></object>
           </div>
         </div>
       )}
@@ -350,10 +328,10 @@ export default function ServiceDetailPage() {
 
       {/* Aksiyon butonları */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-        <button onClick={downloadPdf} disabled={pdfLoading}
-          style={{ display: "flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: pdfLoading ? "not-allowed" : "pointer", opacity: pdfLoading ? 0.6 : 1 }}>
+        <button onClick={downloadPdf}
+          style={{ display: "flex", alignItems: "center", gap: 6, backgroundColor: "#dc2626", color: "#fff", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
           <DocumentArrowDownIcon style={{ width: 16, height: 16 }} />
-          {pdfLoading ? "..." : "PDF İndir"}
+          PDF İndir
         </button>
         <button onClick={downloadExcel}
           style={{ display: "flex", alignItems: "center", gap: 6, backgroundColor: "#059669", color: "#fff", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>
