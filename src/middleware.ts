@@ -36,10 +36,11 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Statik dosyalar ve API auth — her zaman geç
+  // Statik dosyalar, API auth ve PDF raporları — her zaman geç
   const isStaticOrApiAuth =
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/reports/pdf') ||
     pathname === '/favicon.ico';
 
   if (isStaticOrApiAuth) {
