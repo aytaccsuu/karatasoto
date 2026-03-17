@@ -230,7 +230,12 @@ export async function GET(
 
   const pdfBytes = doc.output("arraybuffer");
   const fileName = `musteri_${customer.first_name}_${customer.last_name}_hesabi.pdf`
+    .replace(/İ/g, "i").replace(/Ş/g, "s").replace(/Ğ/g, "g")
+    .replace(/Ö/g, "o").replace(/Ü/g, "u").replace(/Ç/g, "c")
+    .replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ı/g, "i")
+    .replace(/ö/g, "o").replace(/ü/g, "u").replace(/ç/g, "c")
     .replace(/\s+/g, "_")
+    .replace(/[^\x00-\x7F]/g, "")
     .toLowerCase();
 
   return new NextResponse(pdfBytes, {
