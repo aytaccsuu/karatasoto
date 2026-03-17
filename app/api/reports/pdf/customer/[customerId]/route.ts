@@ -186,53 +186,33 @@ export async function GET(
     }
   }
 
-  const txnRows: (string | number)[][] = [];
-  if (!transactions || transactions.length === 0) {
-    txnRows.push(["—", "—", "—", "—"]);
+  const payments = (transactions ?? []).filter((t) => t.transaction_type === "odeme");
+
+  const txnRows: string[][] = [];
+  if (payments.length === 0) {
+    txnRows.push(["—", "—", "—"]);
   } else {
-    // Her hareketi göster: odeme (ödeme alındı) ve veresiye (borç eklendi)
-    for (const t of transactions) {
+    for (const t of payments) {
       const txDate = new Date(t.created_at).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
       const svcDate = t.service_record_id ? (svcDateMap[t.service_record_id] ?? "—") : "—";
-      const typeLabel = t.transaction_type === "odeme" ? "Ödeme Alındı"
-        : t.transaction_type === "veresiye" ? "Veresiye"
-        : "Düzeltme";
-      const amtStr = `${t.amount > 0 ? "+" : ""}${t.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺`;
-      txnRows.push([svcDate, txDate, typeLabel, amtStr]);
+      const amtStr = `${Math.abs(t.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺`;
+      txnRows.push([svcDate, txDate, amtStr]);
     }
   }
 
   autoTable(doc, {
     startY: ty,
-    head: [["Servis Tarihi", "İşlem Tarihi", "Tür", "Tutar"]],
-    body: txnRows as string[][],
+    head: [["Servis Tarihi", "Ödeme Tarihi", "Tutar"]],
+    body: txnRows,
     margin: { left: 14, right: 14 },
     styles: { font: F, fontSize: 8.5, cellPadding: 3, textColor: [51, 65, 85] },
     headStyles: { fillColor: [241, 245, 249], textColor: [100, 116, 139], fontStyle: "bold", fontSize: 8 },
     columnStyles: {
-      0: { cellWidth: 30 },
-      1: { cellWidth: 30 },
-      2: { cellWidth: "auto" },
-      3: { cellWidth: 36, halign: "right" },
+      0: { cellWidth: 40 },
+      1: { cellWidth: 40 },
+      2: { cellWidth: "auto", halign: "right", textColor: [22, 163, 74], fontStyle: "bold" },
     },
     alternateRowStyles: { fillColor: [248, 250, 252] },
-    didParseCell: (data) => {
-      if (data.section === "body" && data.column.index === 2) {
-        const val = data.cell.raw as string;
-        if (val === "Ödeme Alındı") {
-          data.cell.styles.textColor = [22, 163, 74];
-          data.cell.styles.fontStyle = "bold";
-        } else if (val === "Veresiye") {
-          data.cell.styles.textColor = [220, 38, 38];
-          data.cell.styles.fontStyle = "bold";
-        }
-      }
-      if (data.section === "body" && data.column.index === 3) {
-        const raw = data.cell.raw as string;
-        data.cell.styles.textColor = raw.startsWith("+") ? [220, 38, 38] : [22, 163, 74];
-        data.cell.styles.fontStyle = "bold";
-      }
-    },
   });
 
   // Alt satır (footer)
