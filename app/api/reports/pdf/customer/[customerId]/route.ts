@@ -138,7 +138,8 @@ export async function GET(
   } else {
     for (const s of services) {
       const date = new Date(s.service_date).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
-      const plate = (s.vehicle as { plate: string } | null)?.plate ?? "—";
+      const vehicleData = s.vehicle as unknown as { plate: string } | { plate: string }[] | null;
+      const plate = (Array.isArray(vehicleData) ? vehicleData[0]?.plate : vehicleData?.plate) ?? "—";
       const amount = `${s.grand_total.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺`;
       const payLabel = PAYMENT_LABELS[s.payment_type] ?? s.payment_type;
       rows.push([date, plate, amount, payLabel]);
